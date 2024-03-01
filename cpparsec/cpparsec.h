@@ -8,6 +8,7 @@
 #include <memory>
 #include <print>
 #include <iostream>
+#include <string_view>
 
 using std::print, std::println, std::cout;
 
@@ -19,45 +20,66 @@ namespace cpparsec {
 // A parser result can either be successful (carrying the parsed value and remaining input)
 // or a failure (optionally carrying an error message).
 template<typename T>
-using ParserResult = std::optional<std::pair<T, std::string>>;
+using ParserResult = std::optional<T>;
 
+// using InputStream = std::optional<std::string_view>;
 
 template<typename T>
 class Parser {
 public:
-    using ParseFunction = std::function<ParserResult<T>(const std::string&)>;
+    using ParseFunction = std::function<ParserResult<T>(std::string_view&)>;
 
 private:
     std::shared_ptr<ParseFunction> parser;
+    bool valid;
+    // T result;
 
 public:
-    Parser(ParseFunction parser) : 
-        parser(std::make_shared<ParseFunction>(parser)) { }
+    Parser(ParseFunction parser) :
+        parser(std::make_shared<ParseFunction>(parser)),
+        valid(true) 
+    { }
 
-    // Executes the parser
-    ParserResult<T> parse(const std::string& input) const {
+    // Executes the parser, modifying InputStream(implementation only)
+    ParserResult<T> parse(std::string_view& input) const {
         return (*parser)(input);
     }
+
+    // Top level parser execution, parses a string
+    ParserResult<T> parse(const std::string& input) const {
+        std::string_view view = input;
+        return (*parser)(view);
+    }
+
+    //ParserResult<T> parse(ParseFunction p, std::string_view& input) const {
+    //    if (valid) {
+    //        ParseResult result = (*parser)(view));
+    //        valid = result != std::nullopt;
+    //        return result;
+    //    }
+    //    return std::nullopt;
+    //}
 
     // with combinator
     template<typename U>
     Parser<U> with(Parser<U> other) const {
-        return Parser<U>([=, captureParser = parser](const std::string& input) -> ParserResult<U> {
+        return Parser<U>([=, captureParser = parser](std::string_view& input) -> ParserResult<U> {
             if (ParserResult result = this->parse(input)) {
-                return { other.parse(result->second) };
+                return { other.parse(input) };
             }
             return std::nullopt;
-        });
+            });
     }
 
     // Static method to create a parser for a single character
     static Parser<char> character(char c) {
-        return Parser<char>([c](const std::string& input) -> ParserResult<char> {
+        return Parser<char>([c](std::string_view& input) -> ParserResult<char> {
             if (!input.empty() && input[0] == c) {
-                return { {c, input.substr(1)} };
+                input = input.substr(1);
+                return { c };
             }
             return std::nullopt;
-        });
+            });
     }
 
 
@@ -65,21 +87,44 @@ public:
 
 Parser<char> character(char c) {
     return Parser<char>::character(c);
-}    
+}
+
+
+template<typename T>
+class Between : public Parser<T> {
+
+};
+
+// Parse occurence between two parses
+template<typename O, typename C, typename T>
+Parser<T> between(Parser<O> open, Parser<C> close, Parser<T> p) {
+    return Parser<T>([open, close, p](std::string_view& input) -> ParserResult<T> {
+        ParserResult<O> first = open.parse(input);
+        // if (!first) return std::nullopt;
+        ParserResult<T> middle = p.parse(input);
+        ParserResult<C> last = close.parse(input);
+
+        if (first && last) {
+            return middle;
+        }
+
+        return std::nullopt;
+    });
+}
+
 
 // Parse zero or more occurrences
 template<typename T>
 Parser<std::vector<T>> many(Parser<T> p) {
-    return Parser<std::vector<T>>([=](const std::string& input) -> ParserResult<std::vector<T>> {
+    return Parser<std::vector<T>>([=](std::string_view& input) -> ParserResult<std::vector<T>> {
         std::vector<T> values;
-        std::string remaining = input;
-        while (ParserResult<T> result = p.parse(remaining)) {
-            values.push_back(result->first);
-            remaining = result->second;
+        while (ParserResult<T> result = p.parse(input)) {
+            values.push_back(*result);
         }
-        return { {values, remaining} };
-    });
+        return { values };
+        });
 }
+};
 
 //// Parser<T> is a function that takes a string
 //// and returns a ParserResult<T>
@@ -219,8 +264,5 @@ Parser<std::vector<T>> many(Parser<T> p) {
 //        
 //        return { {betweenValue, remaining} };
 //    };
-
-}
-
 
 #endif /* CPPARSEC_H */
