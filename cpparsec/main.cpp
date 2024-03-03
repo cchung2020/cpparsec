@@ -13,18 +13,21 @@ using namespace cpparsec;
 using namespace std;
 
 void test1();
-void test2() {
-
-}
+void test2();
 
 int main() {
+    auto p = cubeParser().parse("1111");
+    cout << * << '\n';
+
+    return 0;
+}
+
+void test2() {
     println("parsing \"azzzb\" with between(character('a'), character('b'), many(character('z'))");
     if (ParserResult result2 = between(character('a'), character('b'), many(character('z'))).parse("azzzb"))
         println("parsed {} 'z' chars", result2->size());
     else
         println("failed to parse");
-
-    return 0;
 }
 
 void test1() {
@@ -70,3 +73,4 @@ void test1() {
     else
         println("failed to parse");
 }
+

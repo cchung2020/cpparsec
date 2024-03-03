@@ -7,6 +7,7 @@
 #include <vector>
 #include <memory>
 #include <print>
+#include <ranges>
 #include <iostream>
 #include <string_view>
 
@@ -32,7 +33,7 @@ public:
 private:
     std::shared_ptr<ParseFunction> parser;
     bool valid;
-    // T result;
+    ParserResult<T> result;
 
 public:
     Parser(ParseFunction parser) :
@@ -85,33 +86,12 @@ public:
 
 };
 
+// Parses an integer32
+Parser<int> integer();
+
 Parser<char> character(char c) {
     return Parser<char>::character(c);
 }
-
-
-template<typename T>
-class Between : public Parser<T> {
-
-};
-
-// Parse occurence between two parses
-template<typename O, typename C, typename T>
-Parser<T> between(Parser<O> open, Parser<C> close, Parser<T> p) {
-    return Parser<T>([open, close, p](std::string_view& input) -> ParserResult<T> {
-        ParserResult<O> first = open.parse(input);
-        // if (!first) return std::nullopt;
-        ParserResult<T> middle = p.parse(input);
-        ParserResult<C> last = close.parse(input);
-
-        if (first && last) {
-            return middle;
-        }
-
-        return std::nullopt;
-    });
-}
-
 
 // Parse zero or more occurrences
 template<typename T>
@@ -124,7 +104,89 @@ Parser<std::vector<T>> many(Parser<T> p) {
         return { values };
         });
 }
+
+// Parse occurence between two parses
+template<typename O, typename C, typename T>
+Parser<T> between(Parser<O> open, Parser<C> close, Parser<T> p) {
+    return Parser<T>([open, close, p](std::string_view& input) -> ParserResult<T> {
+        ParserResult<O> first = open.parse(input);
+        ParserResult<T> middle = p.parse(input);
+        ParserResult<C> last = close.parse(input);
+
+        if (first && last) {
+            return middle;
+        }
+
+        return std::nullopt;
+        });
+}
+
+// Parse occurence between two parses - short circuit abuse
+template<typename O, typename C, typename T>
+Parser<T> between2(Parser<O> open, Parser<C> close, Parser<T> p) {
+    return Parser<T>([open, close, p](std::string_view& input) -> ParserResult<T> {
+        ParserResult<T> middle;
+
+        if (open.parse(input)
+            && (middle = p.parse(input))
+            && close.parse(input)) {
+            return middle;
+        }
+
+        return std::nullopt; // inside the class
+        });
+}
+
+Parser<std::pair<int, std::string>> cubeParser() {
+    return Parser<std::pair<int, std::string>>([](std::string_view& input) {
+        ParserResult<int> cubeNum = integer().parse(input);
+        ParserResult<int> cubeNum2 = integer().parse(input);
+
+        //if (cubeNum && cubeNum2) {
+        //    return { {*cubeNum, ""} };
+        //}
+
+        return std::nullopt; // inside the class
+        });
+}
+
+// Parse occurence between two parses - short circuit abuse
+template<typename O, typename C, typename T>
+Parser<T> between3(Parser<O> open, Parser<C> close, Parser<T> p) {
+    return Parser<T>([open, close, p](std::string_view& input) -> ParserResult<T> {
+        ParserResult<T> result; // inside the class
+        bool valid; // inside the class
+        ParserResult<T> middle;
+
+        if (open.parse(input)
+            && (middle = p.parse(input))
+            && close.parse(input)) {
+            result = middle; // assigning to inside the class
+        }
+
+        return result; // inside the class
+        });
+}
+
 };
+
+/*
+    ============ NUMERIC PROCESSORS ============
+*/
+using namespace cpparsec;
+// Parse occurence between two parses - short circuit abuse
+
+Parser<int> integer() {
+    return Parser<int>([](std::string_view& input) -> ParserResult<int> {
+        ParserResult<int> result = many(character('1')).parse(input)
+            .transform([](std::vector<char> digits) {
+                std::string numStr(digits.begin(), digits.end());
+                return std::stoi(numStr);
+            });
+
+        return result;
+    });
+}
 
 //// Parser<T> is a function that takes a string
 //// and returns a ParserResult<T>
