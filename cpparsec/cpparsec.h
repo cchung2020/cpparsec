@@ -10,7 +10,14 @@
 #include <ranges>
 #include <iostream>
 #include <string_view>
+#include <cctype>
 
+#define CPPARSEC_CHECK(result) \
+    if (!result) { return std::nullopt; }
+#define CPPARSEC_RETURN(val) \
+    if (input) { return val; } return std::nullopt;
+#define CPPARSEC_RETURN_NAMED_INPUT(input, val) \
+    if (input) { return val; } return std::nullopt;
 using std::print, std::println, std::cout;
 
 // #include <string_view>
@@ -23,151 +30,382 @@ namespace cpparsec {
 template<typename T>
 using ParserResult = std::optional<T>;
 
-// using InputStream = std::optional<std::string_view>;
+using InputStream = std::optional<std::string_view>;
 
 template<typename T>
 class Parser {
 public:
-    using ParseFunction = std::function<ParserResult<T>(std::string_view&)>;
+    using ParseFunction = std::function<ParserResult<T>(InputStream&)>;
 
 private:
     std::shared_ptr<ParseFunction> parser;
-    bool valid;
     ParserResult<T> result;
 
 public:
     Parser(ParseFunction parser) :
-        parser(std::make_shared<ParseFunction>(parser)),
-        valid(true) 
+        parser(std::make_shared<ParseFunction>(parser))
     { }
-
-    // Executes the parser, modifying InputStream(implementation only)
-    ParserResult<T> parse(std::string_view& input) const {
-        return (*parser)(input);
-    }
 
     // Top level parser execution, parses a string
     ParserResult<T> parse(const std::string& input) const {
-        std::string_view view = input;
+        InputStream view = { input };
         return (*parser)(view);
     }
 
-    //ParserResult<T> parse(ParseFunction p, std::string_view& input) const {
-    //    if (valid) {
-    //        ParseResult result = (*parser)(view));
-    //        valid = result != std::nullopt;
-    //        return result;
+    // Top level parser execution, parses a string_view
+    // Parser consumes + modifies string_view
+    ParserResult<T> parse(std::string_view& input) const {
+        InputStream view = { input };
+        auto result = (*parser)(view);
+        input = *view;
+        return result;
+    }
+
+    //// Top level parser execution, parses an optional<string>
+    //ParserResult<T> parse(const std::optional<std::string>& input) const {
+    //    if (!input) {
+    //        return std::nullopt;
     //    }
-    //    return std::nullopt;
+
+    //    InputStream view = { *input };
+    //    return (*parser)(view);
     //}
 
-    // with combinator
+    // Executes the parser, modifying InputStream
+    // Implementation only
+    ParserResult<T> parse(InputStream& input) const {
+        // return (*parser)(input);
+        return input ? (*parser)(input) : std::nullopt;
+    }
+
+    // Parses self and other, returns result of other
     template<typename U>
     Parser<U> with(Parser<U> other) const {
-        return Parser<U>([=, captureParser = parser](std::string_view& input) -> ParserResult<U> {
-            if (ParserResult result = this->parse(input)) {
-                return { other.parse(input) };
+        return Parser<U>([=, captureParser = parser](InputStream& input) -> ParserResult<U> {
+            if (ParserResult<T> result = (*captureParser)(input)) {
+                return other.parse(input);
+            }
+            return std::nullopt;
+        });
+    }
+
+    // Parses self and other, returns result of self
+    template<typename U>
+    Parser<T> skip(Parser<U> other) const {
+        return Parser<T>([=, captureParser = parser](InputStream& input) -> ParserResult<T> {
+            ParserResult result = (*captureParser)(input);
+            if (result && other.parse(input)) {
+                return result;
             }
             return std::nullopt;
             });
     }
 
-    // Static method to create a parser for a single character
-    static Parser<char> character(char c) {
-        return Parser<char>([c](std::string_view& input) -> ParserResult<char> {
-            if (!input.empty() && input[0] == c) {
-                input = input.substr(1);
-                return { c };
-            }
-            return std::nullopt;
-            });
+    // Parses self and other, returns pair of both results
+    template<typename U>
+    Parser<std::pair<T, U>> pair_with(Parser<U> other) const {
+        return *this & other;
     }
 
 
+    // Parses occurence satisfying a condition
+    Parser<T> satisfy(std::function<bool(T)> cond) const {
+        return Parser<T>([=, captureParser = parser](InputStream& input) -> ParserResult<T> {
+            auto result = (*captureParser)(input);
+            if (result && cond(*result)) {
+                return result;
+            }
+            return std::nullopt;
+        });
+    }
+    // Parse occurence between two parses
+    template<typename O, typename C>
+    Parser<T> between(Parser<O> open, Parser<C> close) {
+        return open.with(*this).skip(close);
+        //return Parser<T>([=](InputStream& input) -> ParserResult<T> {
+        //    open.parse(input);
+        //    ParserResult<T> middle = p.parse(input);
+        //    close.parse(input);
+
+        //    CPPARSEC_RETURN(middle);
+        //});
+    }
+
+    // Apply a function to the parse result
+    template <typename U>
+    Parser<U> transform(std::function<U(T)> func) const {
+        return Parser<U>([=, captureParser = parser](InputStream& input) -> ParserResult<U> {
+            ParserResult<T> result = (*captureParser)(input);
+            return result.transform(func);
+        });
+    }
 };
 
+
+// << "ignore" operator returns the first result of two parsers
+// a << b is a.skip(b) 
+template <typename T, typename U>
+Parser<T> operator<<(const Parser<T> left, const Parser<U> right) {
+    return left.skip(right);
+}
+
+// >> "sequence" operator returns the second result of two parsers
+// a >> b is a.with(b) 
+template <typename T, typename U>
+Parser<U> operator>>(const Parser<T> left, const Parser<U> right);
+
+// & "and" operator joins two parsers 
+template <typename T, typename U>
+Parser<std::tuple<T, U>> operator&(const Parser<T> left, const Parser<U> right);
+
+// & "and" operator joins a parse and multiple parses into a flat tuple
+template<typename T, typename... Ts>
+Parser<std::tuple<T, Ts...>> operator&(const Parser<T>& left, const Parser<std::tuple<Ts...>>& right);
+
+// & "and" operator joins multiple parses and a parse into a flat tuple
+template<typename T, typename... Ts>
+Parser<std::tuple<T, Ts...>> operator&(const Parser<std::tuple<Ts...>>& left, const Parser<T>& right);
+
+// & "and" operator joins multiple parses and multiple parses into a flat tuple
+template<typename... Ts, typename... Us>
+Parser<std::tuple<Ts..., Us...>> operator&(const Parser<std::tuple<Ts...>>& left, const Parser<std::tuple<Us...>>& right);
+
 // Parses an integer32
-Parser<int> integer();
+Parser<int> int_();
 
-Parser<char> character(char c) {
-    return Parser<char>::character(c);
-}
+// Parsers any character
+Parser<char> any_char();
 
-// Parse zero or more occurrences
+
 template<typename T>
-Parser<std::vector<T>> many(Parser<T> p) {
-    return Parser<std::vector<T>>([=](std::string_view& input) -> ParserResult<std::vector<T>> {
-        std::vector<T> values;
-        while (ParserResult<T> result = p.parse(input)) {
-            values.push_back(*result);
-        }
-        return { values };
-        });
+Parser<T> satisfy(const Parser<T>& parser, std::function<bool(T)> cond) {
+    return parser.satisfy(cond);
 }
 
-// Parse occurence between two parses
-template<typename O, typename C, typename T>
-Parser<T> between(Parser<O> open, Parser<C> close, Parser<T> p) {
-    return Parser<T>([open, close, p](std::string_view& input) -> ParserResult<T> {
-        ParserResult<O> first = open.parse(input);
-        ParserResult<T> middle = p.parse(input);
-        ParserResult<C> last = close.parse(input);
 
-        if (first && last) {
-            return middle;
+// Parsers a single string
+Parser<std::string> string_(const std::string& str) {
+    return Parser<std::string>([=](InputStream& input) -> ParserResult<std::string> {
+        if (input->substr(0, str.size()) == str) {
+            return { str };
         }
 
         return std::nullopt;
         });
 }
 
-// Parse occurence between two parses - short circuit abuse
-template<typename O, typename C, typename T>
-Parser<T> between2(Parser<O> open, Parser<C> close, Parser<T> p) {
-    return Parser<T>([open, close, p](std::string_view& input) -> ParserResult<T> {
-        ParserResult<T> middle;
-
-        if (open.parse(input)
-            && (middle = p.parse(input))
-            && close.parse(input)) {
-            return middle;
+// Parsers any character
+Parser<char> any_char() {
+    return Parser<char>([](InputStream& input) -> ParserResult<char> {
+        if (!input->empty()) {
+            char c = (*input)[0];
+            input->remove_prefix(1);
+            return { c };
         }
 
-        return std::nullopt; // inside the class
+        return std::nullopt;
+    });
+}
+
+// Parsers a single character
+Parser<char> char_(char c) {
+    return Parser<char>([=](InputStream& input) -> ParserResult<char> {
+        if (!input->empty() && (*input)[0] == c) {
+            input->remove_prefix(1);
+            return { c };
+        }
+
+        return std::nullopt;
+        });
+
+    //return any_char().satisfy([=](auto c2) { return c == c2; });
+
+}
+// Parsers a single letter
+Parser<char> letter() {
+    return any_char().satisfy(isalpha);
+}
+
+// Parsers a single digit
+Parser<char> digit() {
+    return any_char().satisfy(isdigit);
+}
+
+// Parsers a single space
+Parser<char> space() {
+    return any_char().satisfy(isspace);
+}
+
+// Parse zero or more occurrences
+template<typename T>
+Parser<std::vector<T>> many(Parser<T> p) {
+    return Parser<std::vector<T>>([=](InputStream& input) -> ParserResult<std::vector<T>> {
+        std::vector<T> values;
+        while (true) {
+            auto starting_point = input->data();
+            if (ParserResult result = p.parse(input)) {
+                values.push_back(*result);
+                continue;
+            }
+            if (starting_point != input->data()) {
+                return std::nullopt; // consumptive fail, stop parsing
+            }
+            break;
+        }
+
+        CPPARSEC_RETURN({ values });
+    });
+}
+
+// Parse zero or more characters, std::string specialization
+Parser<std::string> many(Parser<char> charP) {
+    return Parser<std::string>([=](InputStream& input) -> ParserResult<std::string> {
+        std::string str;
+        while (true) {
+            auto starting_point = input->data();
+            if (ParserResult<char> result = charP.parse(input)) {
+                str.push_back(*result);
+                continue;
+            }
+            if (starting_point != input->data()) {
+                return std::nullopt; // consumptive fail, stop parsing
+            }
+            break;
+        }
+
+        CPPARSEC_RETURN({ str });
+    });
+}
+
+// Parse occurence between two parses
+// between(open, close, p) is open.with(p).skip(close) is open >> p << close
+template<typename O, typename C, typename T>
+Parser<T> between(Parser<O> open, Parser<C> close, Parser<T> p) {
+    return open >> p << close;
+    //return Parser<T>([=](InputStream& input) -> ParserResult<T> {
+    //    open.parse(input);
+    //    ParserResult<T> middle = p.parse(input);
+    //    close.parse(input);
+
+    //    CPPARSEC_RETURN(middle);
+    //});
+}
+
+Parser<std::string> open_space_close() {
+    return Parser<std::string>([](InputStream& input) -> ParserResult<std::string> {
+        ParserResult<char> result = char_('c').parse(input);
+        ParserResult<std::string> value = many(char_(' ')).parse(input);
+        char_(*result).parse(input);
+
+        CPPARSEC_RETURN(*value);
         });
 }
 
 Parser<std::pair<int, std::string>> cubeParser() {
-    return Parser<std::pair<int, std::string>>([](std::string_view& input) {
-        ParserResult<int> cubeNum = integer().parse(input);
-        ParserResult<int> cubeNum2 = integer().parse(input);
+    return Parser<std::pair<int, std::string>>([](InputStream& input)
+            -> ParserResult<std::pair<int, std::string>> {
+        auto cubeNum = int_().parse(input);
+        auto cubeColor = string_("red").parse(input);
 
-        //if (cubeNum && cubeNum2) {
-        //    return { {*cubeNum, ""} };
-        //}
+        if (cubeNum) {
+            return { {*cubeNum, *cubeColor } };
+        }
 
         return std::nullopt; // inside the class
         });
 }
 
-// Parse occurence between two parses - short circuit abuse
-template<typename O, typename C, typename T>
-Parser<T> between3(Parser<O> open, Parser<C> close, Parser<T> p) {
-    return Parser<T>([open, close, p](std::string_view& input) -> ParserResult<T> {
-        ParserResult<T> result; // inside the class
-        bool valid; // inside the class
-        ParserResult<T> middle;
+namespace helper {
+    auto stoi(const std::string& str) {
+        return std::stoi(str);
+    }
 
-        if (open.parse(input)
-            && (middle = p.parse(input))
-            && close.parse(input)) {
-            result = middle; // assigning to inside the class
-        }
-
-        return result; // inside the class
-        });
+    auto stol(const std::string& str) {
+        return std::stol(str);
+    }
 }
 
+// Parses an int
+Parser<int> int_() {
+    return many(digit()).transform<int>(helper::stoi);
+}
+
+
+//// << "ignore" operator returns the first result of two parsers
+//// a << b is a.skip(b) 
+//template <typename T, typename U>
+//Parser<T> operator<<(const Parser<T> left, const Parser<U> right) {
+//    return left.skip(right);
+//}
+
+// >> "sequence" operator returns the second result of two parsers
+// a >> b is a.with(b) 
+template <typename T, typename U>
+Parser<U> operator>>(const Parser<T> left, const Parser<U> right) {
+    return left.with(right);
+}
+
+// & "and" operator joins two parses
+template <typename T, typename U>
+Parser<std::tuple<T, U>> operator&(const Parser<T> left, const Parser<U> right) {
+    return Parser<std::tuple<T, U>>([=](InputStream& input)
+        -> ParserResult<std::tuple<T, U>> {
+        auto a = left.parse(input);
+        auto b = right.parse(input);
+
+        if (a && b) {
+            return { std::make_tuple(*a, *b) };
+        }
+
+        return std::nullopt;
+    });
+}
+
+// & "and" operator joins a parse and multiple parses
+template<typename T, typename... Ts>
+Parser<std::tuple<T, Ts...>> operator&(const Parser<T>& left, const Parser<std::tuple<Ts...>>& right) {
+    return Parser<std::tuple<T, Ts...>>([=](InputStream& input) -> ParserResult<std::tuple<T, Ts...>> {
+        auto a = left.parse(input);
+        auto bs = right.parse(input);
+
+        if (a && bs) {
+            return { std::tuple_cat(std::make_tuple(*a), *bs) };
+        }
+
+        return std::nullopt;
+    });
+}
+
+// & "and" operator joins multiple parses and a parse 
+template<typename T, typename... Ts>
+Parser<std::tuple<T, Ts...>> operator&(const Parser<std::tuple<Ts...>>& left, const Parser<T>& right) {
+    return Parser<std::tuple<T, Ts...>>([=](InputStream& input) -> ParserResult<std::tuple<T, Ts...>> {
+        auto as = left.parse(input);
+        auto b = right.parse(input);
+
+        if (as && b) {
+            return { std::tuple_cat(*as, std::make_tuple(*b)) };
+        }
+
+        return std::nullopt;
+    });
+}
+
+// & "and" operator joins multiple parses and multiple parses
+template<typename... Ts, typename... Us>
+Parser<std::tuple<Ts..., Us...>> operator&(const Parser<std::tuple<Ts...>>& left, const Parser<std::tuple<Us...>>& right) {
+    return Parser<std::tuple<Ts..., Us...>>([=](InputStream& input) -> ParserResult<std::tuple<Ts..., Us...>> {
+        auto as = left.parse(input);
+        auto bs = right.parse(input);
+
+        if (as && bs) {
+            return { std::tuple_cat(*as,*bs) };
+        }
+
+        return std::nullopt;
+        });
+}
+ 
 };
 
 /*
@@ -175,18 +413,6 @@ Parser<T> between3(Parser<O> open, Parser<C> close, Parser<T> p) {
 */
 using namespace cpparsec;
 // Parse occurence between two parses - short circuit abuse
-
-Parser<int> integer() {
-    return Parser<int>([](std::string_view& input) -> ParserResult<int> {
-        ParserResult<int> result = many(character('1')).parse(input)
-            .transform([](std::vector<char> digits) {
-                std::string numStr(digits.begin(), digits.end());
-                return std::stoi(numStr);
-            });
-
-        return result;
-    });
-}
 
 //// Parser<T> is a function that takes a string
 //// and returns a ParserResult<T>
