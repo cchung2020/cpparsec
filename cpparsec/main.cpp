@@ -38,11 +38,11 @@ void test6();
 //}
 
 int main() {
-    auto a = *(int_()).parse("123 ");
-    println(
-        "{} and {}", 
-        a, 2
-    );
+    auto a = (int_()).parse("123");
+    //println(
+    //    "{} and {}", 
+    //    a, 2
+    //);
 
     //test1();
     //test2();
@@ -68,7 +68,7 @@ void test5() {
     auto a1 = any_char();
     auto a2 = any_char();
     Parser<std::tuple<char, char>> abParse = (a1 & a2);
-    
+
     if (auto result = abParse.parse("ab")) {
         auto [a, b] = *result;
         println("successfully paresd {} {}", a, b);
@@ -85,7 +85,7 @@ void test5() {
         println("test5 fail2");
     }
 
-    if (auto result = (abParse & char_('z')).parse("abz")){
+    if (auto result = (abParse & char_('z')).parse("abz")) {
         auto [a, b, z] = *result;
         println("successfully paresd {} {} {}", a, b, z);
     }
