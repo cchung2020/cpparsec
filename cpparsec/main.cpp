@@ -38,18 +38,26 @@ void test6();
 //}
 
 int main() {
-    auto a = (int_()).parse("123");
-    //println(
-    //    "{} and {}", 
-    //    a, 2
-    //);
 
-    //test1();
-    //test2();
-    //test3();
-    //test4();
-    //test5();
-    //test6();
+    string x = "255";
+    string_view x2 = x;
+    if (auto a = (string_("25") | string_("26")).parse(x2)) {
+        println(
+            "{} and {}",
+            *a, 2
+        );
+        println("{} left", x2);
+    }
+    else {
+        println("nothing");
+    }
+
+    test1();
+    test2();
+    test3();
+    test4();
+    test5();
+    test6();
 
     return 0;
 }
@@ -105,28 +113,33 @@ void test5() {
 void test4() {
     println("parsing \"azzzxb\" with between(character('a'), character('b'), many(character('z'))");
     if (ParserResult result2 = many(char_('z')).between(char_('a'), char_('b')).parse("azzzxb"))
-        println("parsed {} 'z' chars (bad, should fail)", result2->size());
+        println("4: parsed {} 'z' chars (bad, should fail)", result2->size());
     else
         println("4: failed to parse between many (ok)");
+    println("parsing \"azzzb\" with between(character('a'), character('b'), many(character('z'))");
+    if (ParserResult result2 = many(char_('z')).between(char_('a'), char_('b')).parse("azzzb"))
+        println("4: parsed {} 'z' chars (ok)", result2->size());
+    else
+        println("4: failed to parse between many (bad, should succeed)");
 
 }
 
 void test3() {
-    auto zxs = many(char_('z').with(char_('x')));
+    auto zxs = many(char_('z') & (char_('x')));
     if (zxs.parse("zxzxzxzy"))
         cout << "suceed (bad, should commit on z fail seeing y)\n";
     else
-        cout << "failed to parse (ok)\n";
+        cout << "3:failed to parse (ok)\n";
 
     if (zxs.parse("zxzxzx"))
         cout << "suceed (ok)\n";
     else
-        cout << "failed to parse (bad, should eat all input)\n";
+        cout << "3:failed to parse (bad, should eat all input)\n";
 
     if (zxs.parse("zxzxzxy"))
         cout << "suceed (ok)\n";
     else
-        cout << "failed to parse (bad, should leave y alone)\n";
+        cout << "3:failed to parse (bad, should leave y alone)\n";
 }
 
 void test2() {
