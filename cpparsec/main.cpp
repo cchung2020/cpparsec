@@ -19,6 +19,20 @@ void test4();
 void test5();
 void test6();
 
+template <typename T>
+Parser<T> optional_parenthesis(Parser<T> p) {
+    println("x");
+    return p | p.between(char_('('), char_(')')) | optional_parenthesis(p);
+}
+
+int main() {
+    ParserResult r1 = optional_parenthesis(digit()).parse("(1)");
+    ParserResult r2 = optional_parenthesis(digit()).parse("2");
+    if (r1 && r2) {
+        println("{} {}", *r1, *r2);
+    }
+}
+
 //// & "and" operator joins two parses
 //Parser<std::tuple<char,char>> operator&(const Parser<char> lhs, const Parser<char> rhs) {
 //    return Parser<std::tuple<char, char>>([=](const std::string& input)
@@ -37,30 +51,38 @@ void test6();
 //        });
 //}
 
-int main() {
-
-    string x = "255";
-    string_view x2 = x;
-    if (auto a = (string_("25") | string_("26")).parse(x2)) {
-        println(
-            "{} and {}",
-            *a, 2
-        );
-        println("{} left", x2);
-    }
-    else {
-        println("nothing");
-    }
-
-    test1();
-    test2();
-    test3();
-    test4();
-    test5();
-    test6();
-
-    return 0;
-}
+//int main() {
+//    auto result = cubeParser().parse("2 red");
+//    if (result) {
+//        auto [num, color] = *result; 
+//        println("{} {}", num, color);
+//    }
+//    else {
+//        println("fail");
+//    }
+//
+//    //string x = "255";
+//    //string_view x2 = x;
+//    //if (auto a = (string_("25") | string_("26")).parse(x2)) {
+//    //    println(
+//    //        "{} and {}",
+//    //        *a, 2
+//    //    );
+//    //    println("{} left", x2);
+//    //}
+//    //else {
+//    //    println("nothing");
+//    //}
+//
+//    //test1();
+//    //test2();
+//    //test3();
+//    //test4();
+//    //test5();
+//    //test6();
+//
+//    return 0;
+//}
 
 void test6() {
     string num = "1234";
