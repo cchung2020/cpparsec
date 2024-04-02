@@ -11,6 +11,7 @@
 #include <iostream>
 #include <string_view>
 #include <cctype>
+#include <algorithm>
 
 #define CPPARSEC_RETURN(...) \
     return std::optional{ __VA_ARGS__ };
@@ -44,6 +45,15 @@
 
 #define CPPARSEC_IF_PARSE_OK(name, p) \
     if (auto name = (p).parse(input))
+
+#define CPPARSEC_SAVE_INPUT_POINT(name) \
+    auto name = input->data();
+
+#define CPPARSEC_INPUT_POINT \
+    input->data()
+
+#define CPPARSEC_PARSERESULT(p) \
+    p.parse(input)
 
 #define CPPARSEC_RESULT(name) *name
 
@@ -258,7 +268,12 @@ namespace cpparsec {
     // Parses a single string
     Parser<std::string> string_(const std::string& str) {
         return Parser<std::string>([=](InputStream& input) -> ParserResult<std::string> {
-            CPPARSEC_FAIL_IF(input->substr(0, str.size()) != str);
+            for (auto c : str) {
+                CPPARSEC_SAVE(c2, any_char());
+                CPPARSEC_FAIL_IF(c != c2);
+            }
+            //CPPARSEC_FAIL_IF(input->substr(0, str.size()) != str);
+            // non consuming fail model
 
             return str;
             });
@@ -330,6 +345,14 @@ namespace cpparsec {
     // Parses a single alphanumeric letter 
     Parser<char> alpha_num() {
         return try_(any_char().satisfy(isalnum));
+    }
+
+    // Parses successfully only if the input is empty
+    Parser<std::monostate> eof() {
+        return CPPARSEC_DEFN(std::monostate) {
+            CPPARSEC_FAIL_IF(input->size() > 0);
+            return std::monostate{};
+        };
     }
 
     // Parse zero or more parses
@@ -415,14 +438,42 @@ namespace cpparsec {
         };
     }
 
+    // Parses p, ignoring the result
+    template<typename T>
+    Parser<std::monostate> skip(Parser<T> p) {
+        return p >> (CPPARSEC_DEFN(std::monostate) { return std::monostate{}; });
+    }
+
+    // Parses for an optional p, suceeds if p fails without consuming
+    template<typename T>
+    Parser<std::monostate> optional_(Parser<T> p) {
+        auto monostate =
+            (CPPARSEC_DEFN(std::monostate) { return std::monostate{}; });
+        return skip(p) | monostate;
+    }
+
+    // Parses for an optional p, suceeds if p fails without consuming
+    template<typename T>
+    Parser<std::optional<T>> optional_result(Parser<T> p) {
+        return CPPARSEC_DEFN(std::optional<T>) {
+            CPPARSEC_SAVE_INPUT_POINT(starting_point);
+            ParserResult<T> result = CPPARSEC_PARSERESULT(p);
+            CPPARSEC_FAIL_IF(!result && starting_point != CPPARSEC_INPUT_POINT);
+
+            return std::optional(result ? result : std::nullopt);
+        };
+        // WIP
+        //return p.transform([](auto r) { return std::optional(r); }) | std::nullopt;
+    }
+
     // Parse zero or more parses, ignoring the results
     template<typename T>
     Parser<std::monostate> skipMany(Parser<T> p) {
         return CPPARSEC_DEFN(std::monostate) {
             while (true) {
-                auto starting_point = input->data(); // Keep track of input to detect no consumption
-                if (!p.parse(input)) {
-                    CPPARSEC_FAIL_IF(starting_point != input->data());
+                CPPARSEC_SAVE_INPUT_POINT(starting_point);
+                if (!CPPARSEC_PARSERESULT(p)) {
+                    CPPARSEC_FAIL_IF(starting_point != CPPARSEC_INPUT_POINT);
                     break;
                 }
             }
@@ -501,7 +552,7 @@ namespace cpparsec {
 
     // Parses an int
     Parser<int> int_() {
-        return many(digit()).transform<int>(helper::stoi);
+        return many1(digit()).transform<int>(helper::stoi);
     }
 
     // << "ignore" operator returns the first result of two parsers
@@ -573,7 +624,6 @@ namespace cpparsec {
 /*
     ============ NUMERIC PROCESSORS ============
 */
-using namespace cpparsec;
 // Parse occurence between two parses - short circuit abuse
 
 //// Parser<T> is a function that takes a string
