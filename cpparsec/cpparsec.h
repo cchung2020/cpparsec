@@ -207,7 +207,7 @@ namespace cpparsec {
 
     namespace helper {
         template <typename T, typename Container = std::vector<T>>
-            requires PushBack<Container, T> && std::movable<Container>
+            requires PushBack<Container, T> && std::movable<Container> 
         Parser<Container> many_accumulator(Parser<T> p, Container&& init = {}) {
             return CPPARSEC_DEFN(Container) {
                 Container values(init);
@@ -369,22 +369,6 @@ namespace cpparsec {
     template<typename T>
     Parser<std::vector<T>> many(Parser<T> p) {
         return helper::many_accumulator<T>(p);
-        //return CPPARSEC_DEFN(std::vector<T>) {
-        //    std::vector<T> values;
-        //    while (true) {
-        //        auto starting_point = input->data();
-        //        
-        //        CPPARSEC_IF_PARSE_OK(val, p) {
-        //            values.push_back(CPPARSEC_RESULT(val));
-        //            continue;
-        //        }
-        //        // consumptive fail, stop parsing
-        //        CPPARSEC_FAIL_IF(starting_point != input->data());
-        //        break;
-        //    }
-        //
-        //    return values;
-        //};
     }
 
     // Parse one or more parses
@@ -392,7 +376,7 @@ namespace cpparsec {
     Parser<std::vector<T>> many1(Parser<T> p) {
         return CPPARSEC_DEFN(std::vector<T>) {
             CPPARSEC_SAVE(first, p);
-            CPPARSEC_SAVE(values, helper::many_accumulator(p, std::vector{ first }));
+            CPPARSEC_SAVE(values, helper::many_accumulator(p, { first }));
 
             return values;
         };
@@ -400,21 +384,7 @@ namespace cpparsec {
 
     // Parse zero or more characters, std::string specialization
     Parser<std::string> many(Parser<char> charP) {
-        return helper::many_accumulator<char, std::string>(charP);
-        //return CPPARSEC_DEFN(std::string) {
-        //    std::string str;
-        //    while (true) {
-        //        auto starting_point = input->data();
-        //        CPPARSEC_IF_PARSE_OK(c, charP) {
-        //            str.push_back(CPPARSEC_RESULT(c));
-        //            continue;
-        //        }
-        //        // consumptive fail, stop parsing
-        //        CPPARSEC_FAIL_IF(starting_point != input->data());
-        //        break;
-        //    }
-        //    return str;
-        //};
+        return helper::many_accumulator(charP, std::string());
     }
 
     // Parse one or more characters, std::string specialization
@@ -425,24 +395,6 @@ namespace cpparsec {
 
             return values;
         };
-        //return CPPARSEC_DEFN(std::string) {
-        //    std::string str;
-        //    CPPARSEC_SAVE(c1, charP);
-        //    str.push_back(c1);
-
-        //    while (true) {
-        //        auto starting_point = input->data();
-        //        CPPARSEC_IF_PARSE_OK(c2, charP) {
-        //            str.push_back(CPPARSEC_RESULT(c2));
-        //            continue;
-        //        }
-        //        // consumptive fail, stop parsing
-        //        CPPARSEC_FAIL_IF(starting_point != input->data());
-        //        break;
-        //    }
-
-        //    return str;
-        //};
     }
 
     // Parses p, ignoring the result
