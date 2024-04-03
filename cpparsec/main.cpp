@@ -26,6 +26,7 @@ Parser<T> optional_parenthesis(Parser<T> p) {
 }
 
 int main() {
+    string x = {};
     ParserResult r1 = optional_parenthesis(digit()).parse("(1)");
     ParserResult r2 = optional_parenthesis(digit()).parse("2");
     if (r1 && r2) {
