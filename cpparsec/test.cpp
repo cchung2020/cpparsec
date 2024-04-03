@@ -192,6 +192,47 @@ BOOST_AUTO_TEST_CASE(Optional_Result_Parser)
     // one more
 
 }
+
+BOOST_AUTO_TEST_CASE(SepBy_Parser)
+{
+    Parser<vector<int>> spaced_ints = sepBy(int_(), space());
+    ParserResult<vector<int>> result1 = spaced_ints.parse("1 2 3 4 5");
+
+    BOOST_REQUIRE(result1.has_value());
+    BOOST_CHECK(*result1 == vector({ 1, 2, 3, 4, 5 }));
+
+    string inputStr = "1 2 3 4x";
+    string_view input = inputStr;
+    ParserResult<vector<int>> result2 = spaced_ints.parse(input);
+
+    BOOST_REQUIRE(result2.has_value());
+    BOOST_CHECK(*result2 == vector({ 1, 2, 3, 4}));
+    BOOST_CHECK(input == "x");
+
+    inputStr = "!1 2 3 4 5";
+    input = inputStr;
+
+    ParserResult<vector<int>> result3 = spaced_ints.parse(input);
+
+    BOOST_REQUIRE(result3.has_value());
+    BOOST_CHECK(input == inputStr);
+
+    Parser<vector<int>> spaced_ints1 = sepBy1(int_(), space());
+    ParserResult<vector<int>> result4 = spaced_ints1.parse(input);
+
+    BOOST_REQUIRE(!result4.has_value());
+
+    Parser<string> char_sepby_spaced_int = sepBy1(any_char(), optional_(space()) >> int_());
+
+    inputStr = "a 1b2c 3y 123z";
+    input = inputStr;
+    ParserResult<string> result5 = char_sepby_spaced_int.parse(input);
+
+    BOOST_REQUIRE(result5.has_value());
+    BOOST_CHECK(*result5 == std::string({ 'a', 'b', 'c', 'y', 'z' }));
+}
+
+
 BOOST_AUTO_TEST_SUITE_END()
 
 //BOOST_AUTO_TEST_SUITE(test2_suite)
