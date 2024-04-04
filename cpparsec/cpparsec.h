@@ -406,6 +406,62 @@ namespace cpparsec {
         };
     }
 
+
+    // Parses p one or more times until end succeeds, returning the parsed values
+    template <typename T, typename U>
+    Parser<std::vector<T>> many1_till(Parser<T> p, Parser<U> end) {
+        return CPPARSEC_DEFN(std::vector<T>) {
+            CPPARSEC_SAVE(first, p);
+            std::vector<T> values = { first };
+
+            while (true) {
+                auto start_point = CPPARSEC_INPUT_POINT;
+
+                if (CPPARSEC_PARSERESULT(end)) {
+                    break; // end parser succeeded, stop accumulating
+                }
+                CPPARSEC_FAIL_IF(start_point != CPPARSEC_INPUT_POINT);
+
+                if (ParserResult<T> result = CPPARSEC_PARSERESULT(p)) {
+                    values.push_back(*result);
+                    continue;
+                }
+
+                // neither end nor p parsed successfully, fail
+                CPPARSEC_FAIL_IF(true);
+            }
+
+            return values;
+        };
+    }
+
+    // Parses p zero or more times until end succeeds, returning the parsed values
+    template <typename T, typename U>
+    Parser<std::vector<T>> many_till(Parser<T> p, Parser<U> end) {
+        return CPPARSEC_DEFN(std::vector<T>) {
+            std::vector<T> values;
+
+            while (true) {
+                auto start_point = CPPARSEC_INPUT_POINT;
+
+                if (CPPARSEC_PARSERESULT(end)) {
+                    break; // end parser succeeded, stop accumulating
+                }
+                CPPARSEC_FAIL_IF(start_point != CPPARSEC_INPUT_POINT);
+
+                if (ParserResult<T> result = CPPARSEC_PARSERESULT(p)) {
+                    values.push_back(*result);
+                    continue;
+                }
+
+                // neither end nor p parsed successfully, fail
+                CPPARSEC_FAIL_IF(true);
+            }
+
+            return values;
+        };
+    }
+
     // Parses p, ignoring the result
     template<typename T>
     Parser<std::monostate> skip(Parser<T> p) {
@@ -455,7 +511,7 @@ namespace cpparsec {
 
     // Parse one or more parses of p separated by sep
     template <typename T, typename U>
-    Parser<std::vector<T>> sepBy1(Parser<T> p, Parser<U> sep) {
+    Parser<std::vector<T>> sep_by1(Parser<T> p, Parser<U> sep) {
         return CPPARSEC_DEFN(std::vector<T>) {
             CPPARSEC_SAVE(first, p);
             CPPARSEC_SAVE(values, helper::many_accumulator(sep >> p, { first }));
@@ -466,13 +522,13 @@ namespace cpparsec {
 
     // Parse zero or more parses of p separated by sep
     template <typename T, typename U>
-    Parser<std::vector<T>> sepBy(Parser<T> p, Parser<U> sep) {
-        return sepBy1(p, sep) | success(std::vector<T>());
+    Parser<std::vector<T>> sep_by(Parser<T> p, Parser<U> sep) {
+        return sep_by1(p, sep) | success(std::vector<T>());
     }
 
     // Parse one or more parses of p separated by sep, std::string specialization
     template <typename T>
-    Parser<std::string> sepBy1(Parser<char> p, Parser<T> sep) {
+    Parser<std::string> sep_by1(Parser<char> p, Parser<T> sep) {
         return CPPARSEC_DEFN(std::string) {
             CPPARSEC_SAVE(first, p);
             CPPARSEC_SAVE(values, helper::many_accumulator(sep >> p, std::string(1, first)));
@@ -483,31 +539,31 @@ namespace cpparsec {
 
     // Parse zero or more parses of p separated by sep, std::string specialization
     template <typename T>
-    Parser<std::string> sepBy(Parser<char> p, Parser<T> sep) {
-        return sepBy1(p, sep) | success("");
+    Parser<std::string> sep_by(Parser<char> p, Parser<T> sep) {
+        return sep_by1(p, sep) | success("");
     }
 
     // Parse zero or more parses of p separated by and ending with sep
     template <typename T, typename U>
-    Parser<std::vector<T>> endBy(Parser<T> p, Parser<U> sep) {
+    Parser<std::vector<T>> end_by(Parser<T> p, Parser<U> sep) {
         return many(p << sep);
     }
 
     // Parse one or more parses of p separated by and ending with sep
     template <typename T, typename U>
-    Parser<std::vector<T>> endBy1(Parser<T> p, Parser<U> sep) {
+    Parser<std::vector<T>> end_by1(Parser<T> p, Parser<U> sep) {
         return many1(p << sep);
     }
 
     // Parse zero or more parses of p separated by and ending with sep, std::string specialization
     template <typename T>
-    Parser<std::string> endBy(Parser<char> p, Parser<T> sep) {
+    Parser<std::string> end_by(Parser<char> p, Parser<T> sep) {
         return many(p << sep);
     }
 
     // Parse one or more parses of p separated by and ending with sep, std::string specialization
     template <typename T>
-    Parser<std::string> endBy1(Parser<char> p, Parser<T> sep) {
+    Parser<std::string> end_by1(Parser<char> p, Parser<T> sep) {
         return many1(p << sep);
     }
 

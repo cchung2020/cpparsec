@@ -193,9 +193,9 @@ BOOST_AUTO_TEST_CASE(Optional_Result_Parser)
 
 }
 
-BOOST_AUTO_TEST_CASE(SepBy_Parser)
+BOOST_AUTO_TEST_CASE(Sep_By_Parser)
 {
-    Parser<vector<int>> spaced_ints = sepBy(int_(), space());
+    Parser<vector<int>> spaced_ints = sep_by(int_(), space());
     ParserResult<vector<int>> result1 = spaced_ints.parse("1 2 3 4 5");
 
     BOOST_REQUIRE(result1.has_value());
@@ -217,12 +217,12 @@ BOOST_AUTO_TEST_CASE(SepBy_Parser)
     BOOST_REQUIRE(result3.has_value());
     BOOST_CHECK(input == inputStr);
 
-    Parser<vector<int>> spaced_ints1 = sepBy1(int_(), space());
+    Parser<vector<int>> spaced_ints1 = sep_by1(int_(), space());
     ParserResult<vector<int>> result4 = spaced_ints1.parse(input);
 
     BOOST_REQUIRE(!result4.has_value());
 
-    Parser<string> char_sepby_spaced_int = sepBy1(any_char(), optional_(space()) >> int_());
+    Parser<string> char_sepby_spaced_int = sep_by1(any_char(), optional_(space()) >> int_());
 
     inputStr = "a 1b2c 3y 123z";
     input = inputStr;
@@ -232,6 +232,53 @@ BOOST_AUTO_TEST_CASE(SepBy_Parser)
     BOOST_CHECK(*result5 == std::string({ 'a', 'b', 'c', 'y', 'z' }));
 }
 
+BOOST_AUTO_TEST_CASE(Many_Till_Parser) {
+    string inputStr = "1 2 3 4 5!...";
+    string_view input = inputStr;
+
+    Parser<vector<int>> nums_till_excl = many_till(int_() << optional_(space()), char_('!'));
+
+    ParserResult<vector<int>> result1 = nums_till_excl.parse(input);
+
+    BOOST_REQUIRE(result1.has_value());
+    BOOST_CHECK(*result1 == vector({1, 2, 3, 4, 5}));
+    BOOST_CHECK(input == "...");
+
+    inputStr = "!nothing";
+    input = inputStr;
+
+    ParserResult<vector<int>> result2 = nums_till_excl.parse(input);
+
+    BOOST_REQUIRE(result2.has_value());
+    BOOST_CHECK(result2->size() == 0);
+    BOOST_CHECK(input == "nothing");
+
+
+    inputStr = "nothing";
+    input = inputStr;
+
+    ParserResult<vector<int>> result3 = nums_till_excl.parse(input);
+
+    BOOST_REQUIRE(!result3.has_value());
+
+    Parser<vector<int>> nums_till_excl1 = many1_till(int_() << optional_(space()), char_('!'));
+
+    inputStr = "!nothing";
+    input = inputStr;
+
+    ParserResult<vector<int>> result4 = nums_till_excl1.parse(input);
+
+    BOOST_REQUIRE(!result4.has_value());
+
+    inputStr = "1 2 3 4 5!...";
+    input = inputStr;
+
+    ParserResult<vector<int>> result5 = nums_till_excl1.parse(input);
+
+    BOOST_REQUIRE(result5.has_value());
+    BOOST_CHECK(*result5 == vector({ 1, 2, 3, 4, 5 }));
+    BOOST_CHECK(input == "...");
+}
 
 BOOST_AUTO_TEST_SUITE_END()
 
