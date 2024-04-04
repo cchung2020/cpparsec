@@ -281,16 +281,22 @@ BOOST_AUTO_TEST_CASE(ManyTill_Parser) {
 }
 
 BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser) {
-    Parser<int> wordToNum = 
-        try_(char_('o') >> try_(look_ahead(string_("ne")))) >> success(1) 
-        | try_(char_('t') >> try_(look_ahead(string_("wo")))) >> success(2)
-        | try_(char_('t') >> try_(look_ahead(string_("hree")))) >> success(3)
-        | try_(char_('f') >> try_(look_ahead(string_("our")))) >> success(4)
-        | try_(char_('f') >> try_(look_ahead(string_("ive")))) >> success(5)
-        | try_(char_('s') >> try_(look_ahead(string_("ix")))) >> success(6)
-        | try_(char_('s') >> try_(look_ahead(string_("even")))) >> success(7)
-        | try_(char_('e') >> try_(look_ahead(string_("ight")))) >> success(8)
-        | try_(char_('n') >> try_(look_ahead(string_("ine")))) >> success(9);
+    auto partialParseNum = [](const string& word, int num) {
+        return try_(
+            char_(word[0]) >> look_ahead(string_(word.substr(1))) >> success(num)
+        );
+    };
+
+    Parser<int> wordToNum =
+        partialParseNum("one", 1)
+        | partialParseNum("two", 2)
+        | partialParseNum("three", 3)
+        | partialParseNum("four", 4)
+        | partialParseNum("five", 5)
+        | partialParseNum("six", 6)
+        | partialParseNum("seven", 7)
+        | partialParseNum("eight", 8)
+        | partialParseNum("nine", 9);
 
     std::function charToInt = [](char c) { return c - '0'; };
 
