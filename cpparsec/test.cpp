@@ -105,7 +105,7 @@ BOOST_AUTO_TEST_CASE(Many_Parser)
     BOOST_REQUIRE(!result5.has_value());
 }
 
-BOOST_AUTO_TEST_CASE(Try_Or_Parser)
+BOOST_AUTO_TEST_CASE(TryOr_Parser)
 {
     string inputStr = "ab";
     string_view input = inputStr;
@@ -193,7 +193,7 @@ BOOST_AUTO_TEST_CASE(Optional_Result_Parser)
 
 }
 
-BOOST_AUTO_TEST_CASE(Sep_By_Parser)
+BOOST_AUTO_TEST_CASE(SepBy_Parser)
 {
     Parser<vector<int>> spaced_ints = sep_by(int_(), space());
     ParserResult<vector<int>> result1 = spaced_ints.parse("1 2 3 4 5");
@@ -232,7 +232,7 @@ BOOST_AUTO_TEST_CASE(Sep_By_Parser)
     BOOST_CHECK(*result5 == std::string({ 'a', 'b', 'c', 'y', 'z' }));
 }
 
-BOOST_AUTO_TEST_CASE(Many_Till_Parser) {
+BOOST_AUTO_TEST_CASE(ManyTill_Parser) {
     string inputStr = "1 2 3 4 5!...";
     string_view input = inputStr;
 
@@ -278,6 +278,36 @@ BOOST_AUTO_TEST_CASE(Many_Till_Parser) {
     BOOST_REQUIRE(result5.has_value());
     BOOST_CHECK(*result5 == vector({ 1, 2, 3, 4, 5 }));
     BOOST_CHECK(input == "...");
+}
+
+BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser) {
+    Parser<int> wordToNum = 
+        try_(char_('o') >> try_(look_ahead(string_("ne")))) >> success(1) 
+        | try_(char_('t') >> try_(look_ahead(string_("wo")))) >> success(2)
+        | try_(char_('t') >> try_(look_ahead(string_("hree")))) >> success(3)
+        | try_(char_('f') >> try_(look_ahead(string_("our")))) >> success(4)
+        | try_(char_('f') >> try_(look_ahead(string_("ive")))) >> success(5)
+        | try_(char_('s') >> try_(look_ahead(string_("ix")))) >> success(6)
+        | try_(char_('s') >> try_(look_ahead(string_("even")))) >> success(7)
+        | try_(char_('e') >> try_(look_ahead(string_("ight")))) >> success(8)
+        | try_(char_('n') >> try_(look_ahead(string_("ine")))) >> success(9);
+
+    std::function charToInt = [](char c) { return c - '0'; };
+
+    Parser<int> number = digit().transform(charToInt) | wordToNum;
+
+    Parser<int> numberBetweenLetters = number.between(
+        (many(not_followed_by(number) >> letter())),
+        (many(not_followed_by(number) >> letter())));
+
+    string inputStr = "x5KZthreeX4twone0Y";
+    string_view input = inputStr;
+
+    ParserResult<vector<int>> result1 = many1(numberBetweenLetters).parse(input);
+
+    BOOST_REQUIRE(result1.has_value());
+    BOOST_CHECK(*result1 == vector({ 5, 3, 4, 2, 1, 0 }));
+    BOOST_CHECK(input == "");
 }
 
 BOOST_AUTO_TEST_SUITE_END()
