@@ -4,7 +4,7 @@
 #include <algorithm>
 
 using namespace cpparsec;
-using std::string, std::string_view, std::vector, std::tuple, std::optional;
+using std::string, std::string_view, std::vector, std::tuple, std::optional, std::function;
 using std::ranges::all_of;
 
 BOOST_AUTO_TEST_SUITE(test1_suite)
@@ -41,6 +41,59 @@ BOOST_AUTO_TEST_CASE(Char_Parser)
     BOOST_CHECK(eof().parse(input).has_value());
 }
 
+BOOST_AUTO_TEST_CASE(String_Parser)
+{
+    string inputStr = "test string";
+    string_view input = inputStr;
+
+    ParserResult<string> result1 = string_("test").parse(input);
+
+    BOOST_REQUIRE(result1.has_value());
+    BOOST_CHECK(*result1 == "test");
+    BOOST_CHECK(input == " string");
+
+    ParserResult<string> result2 = (space() >> string_("string")).parse(input);
+
+    BOOST_REQUIRE(result2.has_value());
+    BOOST_CHECK(*result2 == "string");
+    BOOST_CHECK(input == "");
+
+    ParserResult<string> result3 = string_("finished").parse("finishes");
+
+    BOOST_REQUIRE(!result3.has_value());
+    // BOOST_CHECK(input == "");
+    // very debatable for now, consumptive failing input behavior is unsettled
+
+}
+
+BOOST_AUTO_TEST_CASE(Count_Parser)
+{
+    string inputStr = "1 2 3 4 5 6 7";
+    string_view input = inputStr;
+
+    ParserResult<vector<int>> result1 = count(5, int_() << optional_(space())).parse(input);
+
+    BOOST_REQUIRE(result1.has_value());
+    BOOST_CHECK(*result1 == vector({ 1, 2, 3, 4, 5 }));
+    BOOST_CHECK(input == "6 7");
+
+    ParserResult<vector<int>> result2 = count(3, int_() << optional_(space())).parse(input);
+    
+    BOOST_REQUIRE(!result2.has_value());
+
+    inputStr = "xyxyxyxy!";
+    input = inputStr;
+
+    auto is_xy = [](auto xy) { return xy == tuple('x', 'y'); };
+    ParserResult<vector<tuple<char, char>>> result3 = count(3, char_('x') & char_('y')).parse(input);
+    vector<tuple<char, char>> vec = {  };
+
+    BOOST_REQUIRE(result3.has_value());
+    BOOST_CHECK(result3->size() == 3);
+    BOOST_CHECK(all_of(*result3, is_xy));
+    BOOST_CHECK(input == "xy!");
+}
+
 BOOST_AUTO_TEST_CASE(Between_Parser)
 {
     string inputStr = "xyz";
@@ -54,6 +107,11 @@ BOOST_AUTO_TEST_CASE(Between_Parser)
 
     ParserResult<char> result2 = char_('Y').between(char_('x'), char_('z')).parse("xyz");
     BOOST_REQUIRE(!result2.has_value());
+
+    Parser<string> excl_between_xz = many1(char_('!')).between(char_('x'), char_('z'));
+    ParserResult<string> result3 = excl_between_xz.parse("x!!!!!!!z");
+    BOOST_REQUIRE(result3.has_value());
+    BOOST_REQUIRE(*result3 == "!!!!!!!");
 }
 
 BOOST_AUTO_TEST_CASE(Many_Parser)
@@ -85,7 +143,7 @@ BOOST_AUTO_TEST_CASE(Many_Parser)
     ParserResult<vector<tuple<char, char>>> result3 = many(xy).parse(input);
 
     BOOST_REQUIRE(!result3.has_value());
-    BOOST_CHECK(input == "Z");
+    // BOOST_CHECK(input == "Z");
     // very debatable for now, consumptive failing input behavior is unsettled
 
     inputStr = "HELLOworld";
@@ -253,7 +311,6 @@ BOOST_AUTO_TEST_CASE(ManyTill_Parser) {
     BOOST_CHECK(result2->size() == 0);
     BOOST_CHECK(input == "nothing");
 
-
     inputStr = "nothing";
     input = inputStr;
 
@@ -278,12 +335,25 @@ BOOST_AUTO_TEST_CASE(ManyTill_Parser) {
     BOOST_REQUIRE(result5.has_value());
     BOOST_CHECK(*result5 == vector({ 1, 2, 3, 4, 5 }));
     BOOST_CHECK(input == "...");
+
+    inputStr = "/*inside comment*/!";
+    input = inputStr;
+
+    Parser<string> simple_comment = 
+        string_("/*") >> many_till(any_char(), try_(string_("*/")));
+
+    ParserResult<string> result6 = simple_comment.parse(input);
+
+    BOOST_REQUIRE(result6.has_value());
+    BOOST_CHECK(*result6 == "inside comment");
+    BOOST_CHECK(input == "!");
+
 }
 
 BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser) {
     auto partialParseNum = [](const string& word, int num) {
         return try_(
-            char_(word[0]) >> look_ahead(string_(word.substr(1))) >> success(num)
+            look_ahead(string_(word)) >> char_(word[0]) >> success(num)
         );
     };
 
@@ -306,14 +376,34 @@ BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser) {
         (many(not_followed_by(number) >> letter())),
         (many(not_followed_by(number) >> letter())));
 
-    string inputStr = "x5KZthreeX4twone0Y";
+    string inputStr = "x5KZ4threeXtwone0Y";
     string_view input = inputStr;
 
     ParserResult<vector<int>> result1 = many1(numberBetweenLetters).parse(input);
 
     BOOST_REQUIRE(result1.has_value());
-    BOOST_CHECK(*result1 == vector({ 5, 3, 4, 2, 1, 0 }));
+    BOOST_CHECK(*result1 == vector({ 5, 4, 3, 2, 1, 0 }));
     BOOST_CHECK(input == "");
+}
+Parser<function<int(int, int)>> add_op = success(function([](int a, int b) {return a + b; }));
+Parser<function<int(int, int)>> mul_op = success(function([](int a, int b) {return a * b; }));
+
+Parser<int> expr();
+
+Parser<int> factor() {
+    return int_() | lazy(expr);
+}
+Parser<int> term() {
+    return chainl1(factor(), char_('*') >> mul_op);
+}
+Parser<int> expr() { 
+    return chainl1(term(), char_('+') >> add_op);
+}
+
+BOOST_AUTO_TEST_CASE(ChainL_Parser) {
+    ParserResult<int> result1 = expr().parse("2+3*4");
+    BOOST_REQUIRE(result1);
+    BOOST_CHECK(*result1 == 14);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

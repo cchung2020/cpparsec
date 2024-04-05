@@ -17,27 +17,20 @@
 
 #define CPPARSEC_RETURN(...) \
     return std::optional{ __VA_ARGS__ };
-#define CPPARSEC_RETURN_NAMEDINPUT(input, val) \
-    if (input) { return val; } return std::nullopt;
 
+#define CPPARSEC_SAVE(var, p)          \
+    auto _##var##_ = (p).parse(input); \
+    if (!_##var##_.has_value()) {      \
+        return std::nullopt;           \
+    }                                  \
+    auto var = _##var##_.value();
 
-#define CPPARSEC_SAVE_NAMEDINPUT(var, p, input) \
-    auto _##var = (p).parse(input); \
-    if (!_##var.has_value()) {         \
-        return std::nullopt;      \
-    }                             \
-    auto var = _##var.value();
-#define CPPARSEC_SAVE(var, ...) \
-    CPPARSEC_SAVE_NAMEDINPUT(var, (__VA_ARGS__), input);
-
-#define CPPARSEC_SAVE_PARSER_NAMEDINPUT(var, p, input) \
-    auto _##var = p(input);       \
-    if (!_##var.has_value()) {    \
-        return std::nullopt;      \
-    }                             \
-    auto var = _##var.value();
 #define CPPARSEC_SAVE_PARSER(var, p) \
-    CPPARSEC_SAVE_PARSER_NAMEDINPUT(var, p, input);
+    auto _##var = p(input);          \
+    if (!_##var.has_value()) {       \
+        return std::nullopt;         \
+    }                                \
+    auto var = _##var.value();
 
 #define CPPARSEC_SKIP(p) \
     if (!(p).parse(input)) { return std::nullopt; }
@@ -48,17 +41,13 @@
 #define CPPARSEC_IF_PARSE_OK(name, p) \
     if (auto name = (p).parse(input))
 
-#define CPPARSEC_GET_INPUT \
-    input
+#define CPPARSEC_GET_INPUT input
 
-#define CPPARSEC_GET_INPUT_DATA \
-    input->data()
+#define CPPARSEC_GET_INPUT_DATA input->data()
 
-#define CPPARSEC_SET_INPUT(new_input) \
-    input = new_input;
+#define CPPARSEC_SET_INPUT(new_input) input = new_input;
 
-#define CPPARSEC_PARSERESULT(p) \
-    p.parse(input)
+#define CPPARSEC_PARSERESULT(p) p.parse(input)
 
 #define CPPARSEC_RESULT(name) *name
 
@@ -216,9 +205,10 @@ namespace cpparsec {
         Parser<Container> many_accumulator(Parser<T> p, Container&& init = {}) {
             return CPPARSEC_DEFN(Container) {
                 Container values(init);
+
                 while (true) {
                     auto starting_point = CPPARSEC_GET_INPUT_DATA;
-                    if (ParserResult<T> result = p.parse(input)) {
+                    if (ParserResult<T> result = CPPARSEC_PARSERESULT(p)) {
                         values.push_back(*result);
                         continue;
                     }
@@ -280,18 +270,29 @@ namespace cpparsec {
         return parser.satisfy(cond);
     }
 
+    // Parses a single character
+    Parser<char> char_(char c) {
+        return CPPARSEC_DEFN(char) {
+            CPPARSEC_FAIL_IF(input->empty() || (*input)[0] != c);
+
+            input->remove_prefix(1);
+            return c;
+        };
+
+        //return any_char().satisfy([=](auto c2) { return c == c2; });
+    }
+
     // Parses a single string
     Parser<std::string> string_(const std::string& str) {
         return Parser<std::string>([=](InputStream& input) -> ParserResult<std::string> {
             for (auto c : str) {
-                CPPARSEC_SAVE(c2, any_char());
-                CPPARSEC_FAIL_IF(c != c2);
+                CPPARSEC_SKIP(char_(c));
             }
             //CPPARSEC_FAIL_IF(input->substr(0, str.size()) != str);
             // non consuming fail model, test efficiency
 
             return str;
-        });
+            });
     }
 
     // Parses any character
@@ -303,18 +304,6 @@ namespace cpparsec {
             input->remove_prefix(1);
             return c;
             });
-    }
-
-    // Parses a single character
-    Parser<char> char_(char c) {
-        return CPPARSEC_DEFN(char) {
-            CPPARSEC_FAIL_IF(input->empty() || (*input)[0] != c);
-
-            input->remove_prefix(1);
-            return c;
-        };
-
-        //return any_char().satisfy([=](auto c2) { return c == c2; });
     }
 
     // Parses a single character that satisfies a constraint
@@ -391,14 +380,13 @@ namespace cpparsec {
         };
     }
 
-    // Always fails 
-    template <typename T>
-    Parser<std::monostate> unexpected() {
-        return CPPARSEC_DEFN(std::monostate) {
+    // A parser which always fails without consuming input
+    template <typename T = std::monostate>
+    Parser<T> unexpected() {
+        return CPPARSEC_DEFN(T) {
             return std::nullopt;
         };
     }
-
 
     // Parse zero or more parses
     template<typename T>
@@ -432,6 +420,8 @@ namespace cpparsec {
         };
     }
 
+    template<typename T>
+    Parser<std::monostate> optional_(Parser<T> p);
 
     // Parses p one or more times until end succeeds, returning the parsed values
     template <typename T, typename U>
@@ -487,6 +477,62 @@ namespace cpparsec {
             return values;
         };
     }
+
+    // Parses p one or more times until end succeeds, returning the parsed values, std::string specialization
+    template <typename T>
+    Parser<std::string> many1_till(Parser<char> p, Parser<T> end) {
+        return CPPARSEC_DEFN(std::string) {
+            CPPARSEC_SAVE(first, p);
+            std::string str = { first };
+
+            while (true) {
+                auto start_point = CPPARSEC_GET_INPUT_DATA;
+
+                if (CPPARSEC_PARSERESULT(end)) {
+                    break; // end parser succeeded, stop accumulating
+                }
+                CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA);
+
+                if (ParserResult<char> c = CPPARSEC_PARSERESULT(p)) {
+                    str.push_back(*c);
+                    continue;
+                }
+
+                // neither end nor p parsed successfully, fail
+                CPPARSEC_FAIL_IF(true);
+            }
+
+            return str;
+        };
+    }
+
+    // Parses p zero or more times until end succeeds, returning the parsed values, std::string specialization
+    template <typename T>
+    Parser<std::string> many_till(Parser<char> p, Parser<T> end) {
+        return CPPARSEC_DEFN(std::string) {
+            std::string str;
+
+            while (true) {
+                auto start_point = CPPARSEC_GET_INPUT_DATA;
+
+                if (CPPARSEC_PARSERESULT(end)) {
+                    break; // end parser succeeded, stop accumulating
+                }
+                CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA);
+
+                if (ParserResult<char> c = CPPARSEC_PARSERESULT(p)) {
+                    str.push_back(*c);
+                    continue;
+                }
+
+                // neither end nor p parsed successfully, fail
+                CPPARSEC_FAIL_IF(true);
+            }
+
+            return str;
+        };
+    }
+
 
     // Parses p, ignoring the result
     template<typename T>
@@ -600,14 +646,8 @@ namespace cpparsec {
             std::vector<T> vec(n);
 
             for (int i = 0; i < n; i++) {
-                auto starting_point = CPPARSEC_GET_INPUT_DATA;
-                if (ParserResult<T> result = CPPARSEC_PARSERESULT(p)) {
-                    vec[i] = (*result);
-                    continue;
-                }
-                // consumptive fail, stop parsing
-                CPPARSEC_FAIL_IF(starting_point != CPPARSEC_GET_INPUT_DATA);
-                break;
+                CPPARSEC_SAVE(val, p);
+                vec[i] = val;
             }
 
             return vec;
@@ -624,7 +664,8 @@ namespace cpparsec {
             CPPARSEC_SKIP(open);
             CPPARSEC_SAVE(middle, p);
             CPPARSEC_SKIP(close);
-            CPPARSEC_RETURN(middle);
+
+            return middle;
         };
     }
 
@@ -645,7 +686,7 @@ namespace cpparsec {
         return p.try_();
     }
 
-    // Parses p without consuming input. If p fails, it will consume input. Use try_ to negate this.
+    // Parses p without consuming input. If p fails, it will consume input. Wrap p with try_ to avoid this.
     template <typename T>
     Parser<T> look_ahead(Parser<T> p) {
         return CPPARSEC_DEFN(T) {
@@ -669,6 +710,72 @@ namespace cpparsec {
             return std::monostate{};
         };
     }
+
+    template <typename T>
+    Parser<T> chainl1(Parser<T> p, Parser<std::function<T(T, T)>> func) {
+        return CPPARSEC_DEFN(T) {
+            CPPARSEC_SAVE(arg1, p);
+
+            while (true) {
+                auto start_point = CPPARSEC_GET_INPUT_DATA;
+                ParserResult<std::function<T(T, T)>> f = CPPARSEC_PARSERESULT(func);
+                if (!f) {
+                    CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA);
+                    break;
+                }
+                CPPARSEC_SAVE(arg2, p);
+
+                arg1 = (*f)(arg1, arg2);
+            }
+
+            return arg1;
+        };
+        /*return p >> many(op >> p).transform([func](auto vec) {
+            auto [head, tail] = vec;
+            return std::accumulate(tail.begin(), tail.end(), head,
+                [func](T a, const std::pair<Op, T>& b) {
+                    return func(a, b.first, b.second);
+                });
+            });*/
+    }
+
+    template <typename T, typename Op>
+    Parser<T> chainl(Parser<T> p, Parser<Op> op, std::function<T(T, Op, T)> func) {
+        return chainl1(p, op, func) | success(T{}); // Allow empty sequence
+    }
+
+    //template<typename T>
+    //Parser<T> lazy(std::function<Parser<T>()> parser_func) {
+    //    return parser_func();
+    //    return CPPARSEC_DEFN(T) {
+    //        return CPPARSEC_PARSERESULT(parser_func());
+    //    };
+    //}
+
+    template<typename T>
+    Parser<T> lazy(Parser<T> (*parser_func)()) {
+        return CPPARSEC_DEFN(T) {
+            return CPPARSEC_PARSERESULT(parser_func());
+        };
+    }
+
+    //template <typename T, typename Op>
+    //Parser<T> chainr1(Parser<T> p, Parser<Op> op, std::function<T(T, Op, T)> func) {
+    //    // Helper to build right-associative expression
+    //    auto rest = CPPARSEC_DEFN(T) {
+    //        return (op >> chainr1(p, op, func)).transform([func](auto&& pair) {
+    //            auto [op, b] = pair;
+    //            return func(CPPARSEC_RESULT(p), op, b);
+    //            }) | success(CPPARSEC_RESULT(p));
+    //    };
+
+    //    return p >> rest;
+    //}
+
+    //template <typename T, typename Op>
+    //Parser<T> chainr(Parser<T> p, Parser<Op> op, std::function<T(T, Op, T)> func) {
+    //    return chainr1(p, op, func) | success(T{}); // Allow empty sequence
+    //}
 
     namespace helper {
         auto stoi(const std::string& str) {
