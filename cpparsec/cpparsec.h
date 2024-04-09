@@ -15,8 +15,8 @@
 #include <algorithm>
 #include <utility>
 
-#define CPPARSEC_SAVE(var, p)          \
-    auto _##var##_ = (p).parse(input); \
+#define CPPARSEC_SAVE(var, ...)          \
+    auto _##var##_ = (__VA_ARGS__).parse(input); \
     if (!_##var##_.has_value()) {      \
         return std::nullopt;           \
     }                                  \
@@ -38,12 +38,6 @@
 #define CPPARSEC_DEFN_METHOD(name, ...) \
     _ParserFactory<__VA_ARGS__>() = [=, name = *this](InputStream& input) -> ParseResult<__VA_ARGS__>
 
-
-template <typename C, typename T>
-concept PushBack = requires (C c, T t, C c2) {
-    { c.push_back(t) } -> std::same_as<void>;
-    { c.push_back(std::move(t)) } -> std::same_as<void>;
-};
 
 using std::print, std::println, std::cout;
 
@@ -182,9 +176,15 @@ namespace cpparsec {
         }
     };
 
+    template <typename C, typename T>
+    concept PushBack = requires (C c, T t) {
+        { c.push_back(t) } -> std::same_as<void>;
+        { c.push_back(std::move(t)) } -> std::same_as<void>;
+    };
+
     namespace helper {
-        template <typename T, typename Container = std::vector<T>>
-            requires PushBack<Container, T> && std::movable<Container> 
+        template <typename T, PushBack<T> Container = std::vector<T>>
+            requires std::movable<Container> 
         Parser<Container> many_accumulator(Parser<T> p, Container&& init = {}) {
             return CPPARSEC_DEFN(Container) {
                 Container values(init);
@@ -383,14 +383,14 @@ namespace cpparsec {
     }
 
     // Parse zero or more parses
-    template<typename T>
-    Parser<std::vector<T>> many(Parser<T> p) {
-        return helper::many_accumulator<T>(p);
+    template<typename T, PushBack<T> Container = std::vector<T>>
+    Parser<Container> many(Parser<T> p) {
+        return helper::many_accumulator(p);
     }
 
     // Parse one or more parses
-    template<typename T>
-    Parser<std::vector<T>> many1(Parser<T> p) {
+    template<typename T, PushBack<T> Container = std::vector<T>>
+    Parser<Container> many1(Parser<T> p) {
         return CPPARSEC_DEFN(std::vector<T>) {
             CPPARSEC_SAVE(first, p);
             CPPARSEC_SAVE(values, helper::many_accumulator(p, { first }));
@@ -417,116 +417,68 @@ namespace cpparsec {
     template<typename T>
     Parser<std::monostate> optional_(Parser<T> p);
 
+    namespace helper {
+        template <typename T, typename U, PushBack<T> Container = std::vector<T>>
+            requires std::movable<Container>
+        Parser<Container> many_till_accumulator(Parser<T> p, Parser<U> end, Container&& init = {}) {
+            return CPPARSEC_DEFN(Container) {
+                Container values(init);
+
+                while (true) {
+                    auto start_point = CPPARSEC_GET_INPUT_DATA;
+
+                    if (CPPARSEC_PARSERESULT(end)) {
+                        break; // end parser succeeded, stop accumulating
+                    }
+                    CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA);
+
+                    if (ParseResult<T> result = CPPARSEC_PARSERESULT(p)) {
+                        values.push_back(*result);
+                        continue;
+                    }
+
+                    // neither end nor p parsed successfully, fail
+                    CPPARSEC_FAIL_IF(true);
+                }
+
+                return values;
+            };
+        }
+    };
+
     // Parses p one or more times until end succeeds, returning the parsed values
-    template <typename T, typename U>
-    Parser<std::vector<T>> many1_till(Parser<T> p, Parser<U> end) {
-        return CPPARSEC_DEFN(std::vector<T>) {
+    template <typename T, typename U, PushBack<T> Container = std::vector<T>>
+    Parser<Container> many1_till(Parser<T> p, Parser<U> end) {
+        return CPPARSEC_DEFN(Container) {
             CPPARSEC_SAVE(first, p);
-            std::vector<T> values = { first };
-
-            while (true) {
-                auto start_point = CPPARSEC_GET_INPUT_DATA;
-
-                if (CPPARSEC_PARSERESULT(end)) {
-                    break; // end parser succeeded, stop accumulating
-                }
-                CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA);
-
-                if (ParseResult<T> result = CPPARSEC_PARSERESULT(p)) {
-                    values.push_back(*result);
-                    continue;
-                }
-
-                // neither end nor p parsed successfully, fail
-                CPPARSEC_FAIL_IF(true);
-            }
+            CPPARSEC_SAVE(values, helper::many_till_accumulator(p, end, { first } ));
 
             return values;
         };
     }
 
     // Parses p zero or more times until end succeeds, returning the parsed values
-    template <typename T, typename U>
-    Parser<std::vector<T>> many_till(Parser<T> p, Parser<U> end) {
-        return CPPARSEC_DEFN(std::vector<T>) {
-            std::vector<T> values;
+    template <typename T, typename U, PushBack<T> Container = std::vector<T>>
+    Parser<Container> many_till(Parser<T> p, Parser<U> end) {
+        return helper::many_till_accumulator(p, end);
+    }
 
-            while (true) {
-                auto start_point = CPPARSEC_GET_INPUT_DATA;
-
-                if (CPPARSEC_PARSERESULT(end)) {
-                    break; // end parser succeeded, stop accumulating
-                }
-                CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA);
-
-                if (ParseResult<T> result = CPPARSEC_PARSERESULT(p)) {
-                    values.push_back(*result);
-                    continue;
-                }
-
-                // neither end nor p parsed successfully, fail
-                CPPARSEC_FAIL_IF(true);
-            }
+    // Parses p one or more times until end succeeds, returning the parsed values, std::string specialization
+    template <typename T, PushBack<char> StringContainer = std::string>
+    Parser<StringContainer> many1_till(Parser<char> p, Parser<T> end) {
+        return CPPARSEC_DEFN(StringContainer) {
+            CPPARSEC_SAVE(first, p);
+            CPPARSEC_SAVE(values, helper::many_till_accumulator(p, end, StringContainer({ first })));
 
             return values;
         };
     }
 
-    // Parses p one or more times until end succeeds, returning the parsed values, std::string specialization
-    template <typename T>
-    Parser<std::string> many1_till(Parser<char> p, Parser<T> end) {
-        return CPPARSEC_DEFN(std::string) {
-            CPPARSEC_SAVE(first, p);
-            std::string str = { first };
-
-            while (true) {
-                auto start_point = CPPARSEC_GET_INPUT_DATA;
-
-                if (CPPARSEC_PARSERESULT(end)) {
-                    break; // end parser succeeded, stop accumulating
-                }
-                CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA);
-
-                if (ParseResult<char> c = CPPARSEC_PARSERESULT(p)) {
-                    str.push_back(*c);
-                    continue;
-                }
-
-                // neither end nor p parsed successfully, fail
-                CPPARSEC_FAIL_IF(true);
-            }
-
-            return str;
-        };
-    }
-
     // Parses p zero or more times until end succeeds, returning the parsed values, std::string specialization
-    template <typename T>
-    Parser<std::string> many_till(Parser<char> p, Parser<T> end) {
-        return CPPARSEC_DEFN(std::string) {
-            std::string str;
-
-            while (true) {
-                auto start_point = CPPARSEC_GET_INPUT_DATA;
-
-                if (CPPARSEC_PARSERESULT(end)) {
-                    break; // end parser succeeded, stop accumulating
-                }
-                CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA);
-
-                if (ParseResult<char> c = CPPARSEC_PARSERESULT(p)) {
-                    str.push_back(*c);
-                    continue;
-                }
-
-                // neither end nor p parsed successfully, fail
-                CPPARSEC_FAIL_IF(true);
-            }
-
-            return str;
-        };
+    template <typename T, PushBack<char> StringContainer = std::string>
+    Parser<StringContainer> many_till(Parser<char> p, Parser<T> end) {
+        return helper::many_till_accumulator(p, end, StringContainer());
     }
-
 
     // Parses p, ignoring the result
     template<typename T>
@@ -736,9 +688,10 @@ namespace cpparsec {
         return chainl1(arg, op) | success(backup);
     }
 
-    template<typename T>
-    Parser<T> choice(std::vector<Parser<T>>&& parsers) {
-        if (parsers.size() == 0) {
+    // Parses a sequence of functions, returning on the first successful result.
+    template<typename T, std::ranges::input_range Container>
+    Parser<T> choice(Container parsers) {
+        if (std::ranges::empty(parsers)) {
             return unexpected<T>();
         }
 
@@ -755,7 +708,7 @@ namespace cpparsec {
     }
 
     // Takes a function pointer to a parser (not the parser itself) for deferred evaluation
-    // Use to avoid infinite cycles in mutual/infinte recursion
+    // Can be used to avoid infinite cycles in mutual recursion
     template<typename T>
     Parser<T> lazy(Parser<T> (*parser_func)()) {
         return CPPARSEC_DEFN(T) {

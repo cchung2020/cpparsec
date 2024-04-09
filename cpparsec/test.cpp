@@ -1,4 +1,5 @@
 #define BOOST_TEST_MODULE cpparsec
+
 #include <boost/test/included/unit_test.hpp>
 #include "cpparsec.h"
 #include <algorithm>
@@ -161,6 +162,8 @@ BOOST_AUTO_TEST_CASE(Many_Parser)
     ParseResult<string> result5 = many1(upper()).parse(input);
 
     BOOST_REQUIRE(!result5.has_value());
+
+    // ParseResult<std::u16string> result6 = many1<char, std::u16string>(upper()).parse(input);
 }
 
 BOOST_AUTO_TEST_CASE(TryOr_Parser)
@@ -340,7 +343,7 @@ BOOST_AUTO_TEST_CASE(ManyTill_Parser) {
     input = inputStr;
 
     Parser<string> simple_comment = 
-        string_("/*") >> many_till(any_char(), try_(string_("*/")));
+        string_("/*") >> many1_till(any_char(), try_(string_("*/")));
 
     ParseResult<string> result6 = simple_comment.parse(input);
 
@@ -390,8 +393,9 @@ BOOST_AUTO_TEST_CASE(ChainL_Parser) {
     auto add_op = success(function<int(int, int)>([](int a, int b) { return a + b; }));
     auto mul_op = success(function<int(int, int)>([](int a, int b) { return a * b; }));
 
-    function<Parser<int>()> expr, term, factor;
     auto spaced = [](auto p) { return p.between(spaces(), spaces()); };
+
+    function<Parser<int>()> expr, term, factor;
 
     factor = [&]() { return spaced(int_() | lazy(expr).between(char_('('), char_(')'))); };
     term = [&]() { return chainl1(factor(), char_('*') >> mul_op); };
@@ -436,7 +440,8 @@ BOOST_AUTO_TEST_CASE(ChainL_Parser) {
 }
 
 BOOST_AUTO_TEST_CASE(Choice_Parser) {
-    Parser<int> t_skeleton_nums = choice(vector({
+
+    Parser<int> t_skeleton_nums = choice<int>(vector({
         try_(string_("two") >> spaces() >> success(2)),
         try_(string_("three") >> spaces() >> success(3)),
         try_(string_("ten") >> spaces() >> success(10)),
