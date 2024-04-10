@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <optional>
+#include <expected>
 #include <string>
 #include <vector>
 #include <memory>
@@ -15,11 +16,11 @@
 #include <algorithm>
 #include <utility>
 
-#define CPPARSEC_SAVE(var, ...)          \
+#define CPPARSEC_SAVE(var, ...)                  \
     auto _##var##_ = (__VA_ARGS__).parse(input); \
-    if (!_##var##_.has_value()) {      \
-        return std::nullopt;           \
-    }                                  \
+    if (!_##var##_.has_value()) {                \
+        return std::nullopt;                     \
+    }                                            \
     auto var = _##var##_.value();
 
 #define CPPARSEC_SKIP(p) if (!(p).parse(input)) { return std::nullopt; }
@@ -27,7 +28,7 @@
 #define CPPARSEC_FAIL_IF(cond) if (cond) { return std::nullopt; }
 
 #define CPPARSEC_GET_INPUT input
-#define CPPARSEC_GET_INPUT_DATA input->data()
+#define CPPARSEC_GET_INPUT_DATA input.data()
 #define CPPARSEC_SET_INPUT(new_input) input = new_input;
 #define CPPARSEC_PARSERESULT(p) p.parse(input)
 #define CPPARSEC_RESULT(name) *name
@@ -41,8 +42,14 @@
 
 using std::print, std::println, std::cout;
 
-// #include <string_view>
-// #include <expected>
+//template<typename T>
+//concept StringLike = requires(T str) {
+//    { str.data() } -> std::convertible_to<const char*>;
+//    { str.size() } -> std::convertible_to<std::size_t>;
+//    { str.substr(size_t x , size_t y) } -> std::same_as<T>;
+//    { str.remove_prefix(size_t x) } -> std::same_as<void>;
+//};
+
 
 namespace cpparsec {
 
@@ -51,7 +58,7 @@ namespace cpparsec {
     template<typename T>
     using ParseResult = std::optional<T>;
 
-    using InputStream = std::optional<std::string_view>;
+    using InputStream = std::string_view;
 
     template<typename T>
     class Parser {
@@ -59,35 +66,34 @@ namespace cpparsec {
         using ParseFunction = std::function<ParseResult<T>(InputStream&)>;
 
     private:
-        std::shared_ptr<ParseFunction> parser;
-        ParseResult<T> result;
+        ParseFunction parser;
 
     public:
         Parser(ParseFunction parser) :
-            parser(std::make_shared<ParseFunction>(parser))
+            parser(parser)
         { }
 
         // Top level parser execution, parses a string
         ParseResult<T> parse(const std::string& input) const {
-            InputStream view = { input };
-            return (*parser)(view);
+            InputStream view = input;
+            return parser(view);
         }
 
         // Top level parser execution, parses a string_view
         // Parser consumes/modifies string_view
         ParseResult<T> parse(std::string_view& input) const {
-            InputStream view = { input };
-            auto result = (*parser)(view);
-            input = *view;
+            InputStream view = input;
+            auto result = parser(view);
+            input = view;
             return result;
         }
 
-        // Executes the parser, modifying InputStream
-        // Implementation only
-        ParseResult<T> parse(InputStream& input) const {
-            // return (*parser)(input);
-            return input ? (*parser)(input) : std::nullopt;
-        }
+        //// Executes the parser, modifying InputStream
+        //// Implementation only
+        //ParseResult<T> parse(InputStream& input) const {
+        //    // return (*parser)(input);
+        //    return input ? (*parser)(input) : std::nullopt;
+        //}
 
         // Parses self and other, returns result of other
         template<typename U>
@@ -120,7 +126,7 @@ namespace cpparsec {
         // Parses occurence satisfying a condition
         Parser<T> satisfy(std::function<bool(T)> cond) const {
             return Parser<T>([=, captureParser = parser](InputStream& input) -> ParseResult<T> {
-                auto result = (*captureParser)(input);
+                auto result = captureParser(input);
                 CPPARSEC_FAIL_IF(!result || !cond(*result));
                 
                 return result;
@@ -137,10 +143,10 @@ namespace cpparsec {
         Parser<T> or_(const Parser<T>& right) const {
             return Parser<T>([=, captureParser = parser](InputStream& input) -> ParseResult<T> {
                 auto starting_input = input;
-                if (auto result = (*captureParser)(input)) {
+                if (auto result = captureParser(input)) {
                     return result;
                 }
-                CPPARSEC_FAIL_IF(starting_input->data() != input->data())
+                CPPARSEC_FAIL_IF(starting_input.data() != input.data())
 
                 return right.parse(input);
                 });
@@ -149,7 +155,7 @@ namespace cpparsec {
         Parser<T> try_() {
             return Parser<T>([=, captureParser = parser](InputStream& input) -> ParseResult<T> {
                 auto starting_input = input;
-                if (ParseResult result = (*captureParser)(input)) {
+                if (ParseResult result = captureParser(input)) {
                     return result;
                 }
 
@@ -162,7 +168,7 @@ namespace cpparsec {
         template <typename U>
         auto transform(std::function<U(T)> func) const {
             return Parser<U>([=, captureParser = parser](InputStream& input) -> ParseResult<U> {
-                ParseResult<T> result = (*captureParser)(input);
+                ParseResult<T> result = captureParser(input);
                 return result.transform(func);
             });
         }
@@ -261,13 +267,11 @@ namespace cpparsec {
     // Parses a single character
     Parser<char> char_(char c) {
         return CPPARSEC_DEFN(char) {
-            CPPARSEC_FAIL_IF(input->empty() || (*input)[0] != c);
+            CPPARSEC_FAIL_IF(input.empty() || input[0] != c);
 
-            input->remove_prefix(1);
+            input.remove_prefix(1);
             return c;
         };
-
-        //return any_char().satisfy([=](auto c2) { return c == c2; });
     }
 
     // Parses a single string
@@ -286,10 +290,10 @@ namespace cpparsec {
     // Parses any character
     Parser<char> any_char() {
         return Parser<char>([](InputStream& input) -> ParseResult<char> {
-            CPPARSEC_FAIL_IF(input->empty());
+            CPPARSEC_FAIL_IF(input.empty());
 
-            char c = (*input)[0];
-            input->remove_prefix(1);
+            char c = input[0];
+            input.remove_prefix(1);
             return c;
             });
     }
@@ -298,10 +302,10 @@ namespace cpparsec {
     // Faster than try_(any_char().satisfy(cond))
     Parser<char> char_satisfy(std::function<bool(char)> cond) {
         return CPPARSEC_DEFN(char) {
-            CPPARSEC_FAIL_IF(input->empty() || !cond((*input)[0]));
+            CPPARSEC_FAIL_IF(input.empty() || !cond(input[0]));
 
-            char c = (*input)[0];
-            input->remove_prefix(1);
+            char c = input[0];
+            input.remove_prefix(1);
             return c;
         };
     }
@@ -360,7 +364,7 @@ namespace cpparsec {
     // Parses successfully only if the input is empty
     Parser<std::monostate> eof() {
         return CPPARSEC_DEFN(std::monostate) {
-            CPPARSEC_FAIL_IF(input->size() > 0);
+            CPPARSEC_FAIL_IF(input.size() > 0);
             return std::monostate{};
         };
     }
