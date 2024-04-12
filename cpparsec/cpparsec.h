@@ -26,6 +26,7 @@
     }                                                                          \
 
 #define CPPARSEC_FAIL_IF(cond, message) if (cond) { return std::unexpected(message); }
+#define CPPARSEC_FAIL(message) return std::unexpected(message);
 
 #define CPPARSEC_GET_INPUT input
 #define CPPARSEC_GET_INPUT_DATA input.data()
@@ -44,7 +45,6 @@ using std::println, std::format, std::string, std::string_view;
 namespace cpparsec {
     template<typename T>
     using ParseResult = std::expected<T, std::string>;
-
     using InputStream = std::string_view;
 
     template<typename T>
@@ -56,8 +56,8 @@ namespace cpparsec {
         ParseFunction parser;
 
     public:
-        Parser(ParseFunction parser) :
-            parser(parser)
+        Parser(ParseFunction&& parser) :
+            parser(std::move(parser))
         { }
 
         // Top level parser execution, parses a string
@@ -167,8 +167,8 @@ namespace cpparsec {
     template <typename T>
     class _ParserFactory {
     public:
-        Parser<T> operator=(Parser<T>::ParseFunction parser) {
-            return Parser<T>(parser);
+        Parser<T> operator=(Parser<T>::ParseFunction&& parser) {
+            return Parser<T>(std::move(parser));
         }
     };
 
@@ -233,13 +233,13 @@ namespace cpparsec {
 
     // Add an error message to the parse result if it fails
     template <typename T>
-    Parser<T> operator^(Parser<T> p, std::string&& msg) {
-        return CPPARSEC_DEFN(T) {
+    Parser<T> operator^(Parser<T>&& p, std::string&& msg) {
+        return _ParserFactory<T>() = [=](InputStream& input)->ParseResult<T> {
             ParseResult<T> result = CPPARSEC_PARSERESULT(p);
             if (!result.has_value()) {
                 return std::unexpected(format("{}. {}", result.error(), msg));
             }
-            return result;
+            return std::move(CPPARSEC_PARSERESULT(p));
         };
     }
 
@@ -259,8 +259,8 @@ namespace cpparsec {
     // Parses a single character
     Parser<char> char_(char c) {
         return CPPARSEC_DEFN(char) {
-            CPPARSEC_FAIL_IF(input.empty(), format("Unexpected end of input, expected '{}'", c));
-            CPPARSEC_FAIL_IF(input[0] != c, format("Unexpected '{}' instead of '{}'", input[0], c));
+            CPPARSEC_FAIL_IF(input.empty(), format("Got end of input, wanted '{}'", c));
+            CPPARSEC_FAIL_IF(input[0] != c, format("Got '{}', wanted '{}'", input[0], c));
 
             input.remove_prefix(1);
             return c;
@@ -269,63 +269,39 @@ namespace cpparsec {
 
     // Parses a single string
     Parser<std::string> string_(const std::string& str) {
-        return Parser<std::string>([=](InputStream& input) -> ParseResult<std::string> {
+        return CPPARSEC_DEFN(std::string) {
+            CPPARSEC_FAIL_IF(str.size() > input.size(), format("Got end of input, wanted '{}'", str[0]));
+
             for (auto [i, c] : str | std::views::enumerate) {
-                CPPARSEC_SKIP(char_(c) ^ format("Expected string \"{}\", got \"{}\"", str, str.substr(0,i)));
-            }
-            //CPPARSEC_FAIL_IF(input->substr(0, str.size()) != str);
-            // non consuming fail model, test efficiency
+                if (c != input[i]) {
+                    char c2 = input[i];
+                    auto str2 = input.substr(0, i + 1);
+                    input.remove_prefix(i);
 
-            return str;
-            });
-    }
-
-    // Parses a single string
-    Parser<std::string> string2_(const std::string& str) {
-        return Parser<std::string>([=](InputStream& input) -> ParseResult<std::string> {
-            for (auto [i, c] : str | std::views::enumerate) {
-                CPPARSEC_SKIP(char_(c) ^ "");
+                    CPPARSEC_FAIL(format("Got '{}', wanted '{}'. Got \"{}\", wanted \"{}\"", c2, c, str2, str));
+                }
             }
 
+            input.remove_prefix(str.size());
             return str;
-            });
+        };
     }
 
+    //// Parses a single string
+    //Parser<std::string> string_slower(const std::string& str) {
+    //    return CPPARSEC_DEFN(std::string) {
+    //        for (auto [i, c] : str | std::views::enumerate) {
+    //            CPPARSEC_FAIL_IF(c != input[0], format(
+    //                "Got '{}', wanted '{}'. Got \"{}\", wanted \"{}\", ",
+    //                input[0], c, str.substr(0, i), str
+    //            ));
 
-    // Parses a single string
-    Parser<std::string> string3_(const std::string& str) {
-        return Parser<std::string>([=](InputStream& input) -> ParseResult<std::string> {
-            for (auto [i, c] : str | std::views::enumerate) {
-                CPPARSEC_SKIP(char_(c));
-            }
+    //            input.remove_prefix(1);
+    //        }
 
-            return str;
-            });
-    }
-
-    // Parses a single string
-    Parser<std::string> string4_(const std::string& str) {
-        return Parser<std::string>([=](InputStream& input) -> ParseResult<std::string> {
-            for (auto c : str) {
-                CPPARSEC_SKIP(char_(c));
-            }
-
-            return str;
-            });
-    }
-
-    // Parses a single string
-    Parser<std::string> string5_(const std::string& str) {
-        return Parser<std::string>([=](InputStream& input) -> ParseResult<std::string> {
-            for (auto [i, c] : str | std::views::enumerate) {
-                CPPARSEC_FAIL_IF(i < input.size() && c != input[i], format("Expected string \"{}\", got \"{}\"", str, str.substr(0, i)));
-            }
-            //CPPARSEC_FAIL_IF(input->substr(0, str.size()) != str);
-            // non consuming fail model, test efficiency
-
-            return str;
-            });
-    }
+    //        return str;
+    //    };
+    //}
 
     namespace helper {
         template <typename T, PushBack<T> Container = std::vector<T>>
@@ -353,7 +329,7 @@ namespace cpparsec {
     // Parses any character
     Parser<char> any_char() {
         return Parser<char>([](InputStream& input) -> ParseResult<char> {
-            CPPARSEC_FAIL_IF(input.empty(), "Unexpected end of input, expected any_char");
+            CPPARSEC_FAIL_IF(input.empty(), "fcted end of input, expected any_char");
 
             char c = input[0];
             input.remove_prefix(1);
@@ -382,6 +358,11 @@ namespace cpparsec {
     // Parses a single digit
     Parser<char> digit() {
         return char_satisfy(isdigit) ^ "Expected a digit";
+    }
+
+    // Parses a single digit
+    Parser<char> digit2() {
+        return char_satisfy(isdigit);
     }
 
     // Parses a single space

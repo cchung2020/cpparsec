@@ -31,7 +31,7 @@ BOOST_AUTO_TEST_CASE(Char_Parser_Failure)
     ParseResult<char> result = char_('A').parse(input);
 
     BOOST_REQUIRE(!result.has_value());
-    BOOST_CHECK(result.error() == "Unexpected 'a' instead of 'A'");
+    BOOST_CHECK(result.error() == "Got 'a', wanted 'A'");
 }
 
 BOOST_AUTO_TEST_CASE(Char_And_Operator)
@@ -66,7 +66,7 @@ BOOST_AUTO_TEST_CASE(Char_Parser_End_Of_Input)
     ParseResult<char> result = char_('x').parse("");
 
     BOOST_REQUIRE(!result.has_value());
-    BOOST_CHECK(result.error() == "Unexpected end of input, expected 'x'");
+    BOOST_CHECK(result.error() == "Got end of input, wanted 'x'");
 }
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -104,7 +104,7 @@ BOOST_AUTO_TEST_CASE(String_Parser_Failure)
     ParseResult<string> result = string_("finished").parse("finishes");
 
     BOOST_REQUIRE(!result.has_value());
-    BOOST_CHECK(result.error() == "Unexpected 's' instead of 'd'. Expected string \"finished\", got \"finishe\"");
+    BOOST_CHECK(result.error() == "Got 's', wanted 'd'. Got \"finishes\", wanted \"finished\"");
 }
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -173,7 +173,7 @@ BOOST_AUTO_TEST_CASE(Between_Parser_Failure)
     ParseResult<char> result = char_('Y').between(char_('x'), char_('z')).parse("xyz");
 
     BOOST_REQUIRE(!result.has_value());
-    BOOST_CHECK(result.error() == "Unexpected 'y' instead of 'Y'. Between failed");
+    BOOST_CHECK(result.error() == "Got 'y', wanted 'Y'. Between failed");
 }
 
 BOOST_AUTO_TEST_CASE(Between_Parser_Complex_Type)
@@ -401,6 +401,7 @@ BOOST_AUTO_TEST_CASE(Optional_Result_Parser_No_Int)
 BOOST_AUTO_TEST_SUITE_END()
 
 // --------------------------- ChainL Parser ---------------------------
+
 BOOST_AUTO_TEST_SUITE(ChainL_Parsers)
 
 BOOST_AUTO_TEST_CASE(ChainL_Parser) 
@@ -457,6 +458,7 @@ BOOST_AUTO_TEST_CASE(ChainL_Parser)
 BOOST_AUTO_TEST_SUITE_END()
 
 // --------------------------- LookAhead_NotFollowedBy Parser ---------------------------
+
 BOOST_AUTO_TEST_SUITE(LookAhead_NotFollowedBy_Parsers)
 
 BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser) 
@@ -521,4 +523,3 @@ BOOST_AUTO_TEST_CASE(Choice_Parser_Multiple_Choices)
 
 BOOST_AUTO_TEST_SUITE_END()
 
-// Additional suites for ChainL and LookAhead_NotFollowedBy would follow here
