@@ -234,12 +234,12 @@ namespace cpparsec {
     // Add an error message to the parse result if it fails
     template <typename T>
     Parser<T> operator^(Parser<T>&& p, std::string&& msg) {
-        return _ParserFactory<T>() = [=](InputStream& input)->ParseResult<T> {
+        return CPPARSEC_DEFN(T) {
             ParseResult<T> result = CPPARSEC_PARSERESULT(p);
             if (!result.has_value()) {
                 return std::unexpected(format("{}. {}", result.error(), msg));
             }
-            return std::move(CPPARSEC_PARSERESULT(p));
+            return std::move(result);
         };
     }
 
