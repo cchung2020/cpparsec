@@ -42,9 +42,48 @@
 
 using std::println, std::format, std::string, std::string_view;
 
+
 namespace cpparsec {
+    struct ErrorContent : std::expected<std::pair<std::string, std::string>, std::string> { };
+
+    struct ParseError {
+        std::vector<ErrorContent> expected_found;
+        //std::vector<std::optional<std::string>> messages;
+
+        ParseError(ErrorContent&& err)
+            : expected_found({ err })
+        {}
+        ParseError(std::string&& expected, std::string&& found)
+            : expected_found({ ErrorContent{std::pair{expected, found}} })
+        {}
+        ParseError(std::string&& msg)
+            : expected_found({ ErrorContent{std::unexpected(msg)} })
+        {}
+        ParseError(std::vector<ErrorContent>&& errs)
+            : expected_found(errs)
+        {}
+
+        void add_error(ErrorContent&& err) {
+            expected_found.push_back(err);
+        }
+
+        std::string message() {
+            return format("{}", expected_found[0]);
+        }
+        std::string message_stack() {
+            std::string msg = format("{}", expected_found[0]);
+
+            for (size_t i = 1; i < expected_found.size(); i++) {
+                msg += format("\n{}", expected_found[i]);
+            }
+
+            return msg;
+        }
+    };
+
     template<typename T>
-    using ParseResult = std::expected<T, std::string>;
+    using ParseResult = std::expected<T, ParseError>;
+
     using InputStream = std::string_view;
 
     template<typename T>
@@ -150,8 +189,8 @@ namespace cpparsec {
                 }
 
                 input = starting_input; // undo input consumption
-                CPPARSEC_FAIL_IF(true, "try_ ok");
-                });
+                CPPARSEC_FAIL_IF(true, ParseError("try_", "try_"));
+            });
         }
 
         // Apply a function to the parse result
@@ -234,12 +273,12 @@ namespace cpparsec {
     // Add an error message to the parse result if it fails
     template <typename T>
     Parser<T> operator^(Parser<T>&& p, std::string&& msg) {
-        return _ParserFactory<T>() = [=](InputStream& input)->ParseResult<T> {
+        return CPPARSEC_DEFN(T) {
             ParseResult<T> result = CPPARSEC_PARSERESULT(p);
             if (!result.has_value()) {
-                return std::unexpected(format("{}. {}", result.error(), msg));
+                result.error().add_error({ std::unexpected(msg) });
             }
-            return std::move(CPPARSEC_PARSERESULT(p));
+            return std::move(result);
         };
     }
 
@@ -249,7 +288,7 @@ namespace cpparsec {
         return CPPARSEC_DEFN(T) {
             ParseResult<T> result = CPPARSEC_PARSERESULT(p);
             if (!result.has_value()) {
-                return std::unexpected(msg);
+                result.error() = ParseError(msg);
             }
             return result;
         };
@@ -259,8 +298,8 @@ namespace cpparsec {
     // Parses a single character
     Parser<char> char_(char c) {
         return CPPARSEC_DEFN(char) {
-            CPPARSEC_FAIL_IF(input.empty(), format("Got end of input, wanted '{}'", c));
-            CPPARSEC_FAIL_IF(input[0] != c, format("Got '{}', wanted '{}'", input[0], c));
+            CPPARSEC_FAIL_IF(input.empty(), ParseError("end of input", { c }));
+            CPPARSEC_FAIL_IF(input[0] != c, ParseError({ input[0] }, { c }));
 
             input.remove_prefix(1);
             return c;
@@ -270,15 +309,18 @@ namespace cpparsec {
     // Parses a single string
     Parser<std::string> string_(const std::string& str) {
         return CPPARSEC_DEFN(std::string) {
-            CPPARSEC_FAIL_IF(str.size() > input.size(), format("Got end of input, wanted '{}'", str[0]));
+            CPPARSEC_FAIL_IF(str.size() > input.size(), ParseError("end of input", { str[0] }));
 
             for (auto [i, c] : str | std::views::enumerate) {
                 if (c != input[i]) {
                     char c2 = input[i];
-                    auto str2 = input.substr(0, i + 1);
+                    auto str2 = std::string(input.substr(0, i + 1));
                     input.remove_prefix(i);
 
-                    CPPARSEC_FAIL(format("Got '{}', wanted '{}'. Got \"{}\", wanted \"{}\"", c2, c, str2, str));
+                    CPPARSEC_FAIL(std::vector({
+                        ErrorContent{ std::pair{ std::string{c}, std::string{c2} }},
+                        ErrorContent{ std::pair{ str, str2 } }
+                    }));
                 }
             }
 
@@ -317,7 +359,7 @@ namespace cpparsec {
                         continue;
                     }
                     // consumptive fail, stop parsing
-                    CPPARSEC_FAIL_IF(starting_point != CPPARSEC_GET_INPUT_DATA, "many_accumulator failed");
+                    CPPARSEC_FAIL_IF(starting_point != CPPARSEC_GET_INPUT_DATA, ParseError("many_acc", "many_acc"));
                     break;
                 }
 
@@ -329,7 +371,7 @@ namespace cpparsec {
     // Parses any character
     Parser<char> any_char() {
         return Parser<char>([](InputStream& input) -> ParseResult<char> {
-            CPPARSEC_FAIL_IF(input.empty(), "fcted end of input, expected any_char");
+            CPPARSEC_FAIL_IF(input.empty(), ParseError("end of input", "any_char"));
 
             char c = input[0];
             input.remove_prefix(1);
@@ -341,8 +383,8 @@ namespace cpparsec {
     // Faster than try_(any_char().satisfy(cond))
     Parser<char> char_satisfy(std::function<bool(char)> cond) {
         return CPPARSEC_DEFN(char) {
-            CPPARSEC_FAIL_IF(input.empty(), "Unexpected end of input, failed satisfy");
-            CPPARSEC_FAIL_IF(!cond(input[0]), std::format("Unexpected '{}' failed satisfy", input[0]));
+            CPPARSEC_FAIL_IF(input.empty(), ParseError("end of input", "Failed satisfy"));
+            CPPARSEC_FAIL_IF(!cond(input[0]), ParseError({ input[0] }, "Failed satisfy"));
 
             char c = input[0];
             input.remove_prefix(1);
@@ -409,7 +451,7 @@ namespace cpparsec {
     // Parses successfully only if the input is empty
     Parser<std::monostate> eof() {
         return CPPARSEC_DEFN(std::monostate) {
-            CPPARSEC_FAIL_IF(input.size() > 0, format("Expected end of input, found {}", input[0]));
+            CPPARSEC_FAIL_IF(input.size() > 0, ParseError({ input[0] }, "end of input"));
             return std::monostate{};
         };
     }
@@ -427,7 +469,7 @@ namespace cpparsec {
     template <typename T = std::monostate>
     Parser<T> unexpected() {
         return CPPARSEC_DEFN(T) {
-            return std::unexpected("unexpected!");
+            return std::unexpected(ParseError("unexpected!", "unexpected!"));
         };
     }
 
@@ -479,7 +521,7 @@ namespace cpparsec {
                     if (CPPARSEC_PARSERESULT(end)) {
                         break; // end parser succeeded, stop accumulating
                     }
-                    CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA, "many_tillfail");
+                    CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA, ParseError("many_tillfail", "many_tillfail"));
 
                     if (ParseResult<T> result = CPPARSEC_PARSERESULT(p)) {
                         values.push_back(*result);
@@ -487,7 +529,7 @@ namespace cpparsec {
                     }
 
                     // neither end nor p parsed successfully, fail
-                    CPPARSEC_FAIL_IF(true, "many_tillfail");
+                    CPPARSEC_FAIL(ParseError("many_tillfail", "many_tillfail"));
                 }
 
                 return values;
@@ -547,7 +589,7 @@ namespace cpparsec {
         return CPPARSEC_DEFN(std::optional<T>) {
             auto start_point = CPPARSEC_GET_INPUT_DATA;
             ParseResult<T> result = CPPARSEC_PARSERESULT(p);
-            CPPARSEC_FAIL_IF(!result && start_point != CPPARSEC_GET_INPUT_DATA, "optional_result_fail");
+            CPPARSEC_FAIL_IF(!result && start_point != CPPARSEC_GET_INPUT_DATA, ParseError("optional_result", "optional_result"));
 
             return (result ? std::optional(result.value()) : std::nullopt);
         };
@@ -562,7 +604,7 @@ namespace cpparsec {
             while (true) {
                 auto starting_point = CPPARSEC_GET_INPUT_DATA;
                 if (!CPPARSEC_PARSERESULT(p)) {
-                    CPPARSEC_FAIL_IF(starting_point != CPPARSEC_GET_INPUT_DATA, "skip_many failed");
+                    CPPARSEC_FAIL_IF(starting_point != CPPARSEC_GET_INPUT_DATA, ParseError("skip_many", "skip_many"));
                     break;
                 }
             }
@@ -700,7 +742,7 @@ namespace cpparsec {
             auto input_copy = CPPARSEC_GET_INPUT;
             ParseResult<T> result = CPPARSEC_PARSERESULT(p);
             CPPARSEC_SET_INPUT(input_copy);
-            CPPARSEC_FAIL_IF(result.has_value(), "not followed by failed");
+            CPPARSEC_FAIL_IF(result.has_value(), ParseError("not_followed_by", "not_followed_by"));
 
             return std::monostate{};
         };
@@ -717,7 +759,7 @@ namespace cpparsec {
                 auto start_point = CPPARSEC_GET_INPUT_DATA;
                 ParseResult<std::function<T(T, T)>> f = CPPARSEC_PARSERESULT(op);
                 if (!f) {
-                    CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA, "chainl1 failed");
+                    CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA, ParseError("chainl1", "chainl1"));
                     break;
                 }
                 CPPARSEC_SAVE(arg2, arg);
@@ -867,3 +909,18 @@ namespace cpparsec {
             });
     }
 }
+
+template <>
+struct std::formatter<cpparsec::ErrorContent> {
+    // for debugging only
+
+    auto parse(std::format_parse_context& ctx) {
+        return ctx.begin();
+    }
+
+    auto format(const cpparsec::ErrorContent& err, std::format_context& ctx) const {
+        return err.has_value() 
+            ? std::format_to(ctx.out(), "Expected \"{}\", found \"{}\"", err->first, err->second)
+            : std::format_to(ctx.out(), "{}", err.error());
+    }
+};
