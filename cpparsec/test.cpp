@@ -93,7 +93,6 @@ BOOST_AUTO_TEST_CASE(String_Parser_With_Space)
     string_view input = inputStr;
 
     ParseResult<string> result = (space() >> string_("string")).parse(input);
-
     BOOST_REQUIRE(result.has_value());
     BOOST_CHECK(*result == "string");
     BOOST_CHECK(input == "");
