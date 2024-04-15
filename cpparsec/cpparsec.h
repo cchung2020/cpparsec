@@ -11,6 +11,7 @@
 #include <cctype>
 #include <concepts>
 #include <algorithm>
+#include <variant>
 #include <utility>
 
 #define CPPARSEC_SAVE(var, ...)                    \
@@ -44,7 +45,7 @@ using std::println, std::format, std::string, std::string_view;
 
 
 namespace cpparsec {
-    struct ErrorContent : std::expected<std::pair<std::string, std::string>, std::string> { };
+    struct ErrorContent : std::variant<std::pair<std::string, std::string>, std::pair<char,char>, std::string> { };
 
     struct ParseError {
         std::vector<ErrorContent> expected_found;
@@ -56,8 +57,11 @@ namespace cpparsec {
         ParseError(std::string&& expected, std::string&& found)
             : expected_found({ ErrorContent{std::pair{expected, found}} })
         {}
+        ParseError(char expected, char found)
+            : expected_found({ ErrorContent{std::pair{std::string{expected}, std::string{found}}} })
+        {}
         ParseError(std::string&& msg)
-            : expected_found({ ErrorContent{std::unexpected(msg)} })
+            : expected_found({ ErrorContent{msg} })
         {}
         ParseError(std::vector<ErrorContent>&& errs)
             : expected_found(errs)
@@ -276,7 +280,7 @@ namespace cpparsec {
         return CPPARSEC_DEFN(T) {
             ParseResult<T> result = CPPARSEC_PARSERESULT(p);
             if (!result.has_value()) {
-                result.error().add_error({ std::unexpected(msg) });
+                result.error().add_error({ msg });
             }
             return std::move(result);
         };
@@ -299,7 +303,7 @@ namespace cpparsec {
     Parser<char> char_(char c) {
         return CPPARSEC_DEFN(char) {
             CPPARSEC_FAIL_IF(input.empty(), ParseError("end of input", { c }));
-            CPPARSEC_FAIL_IF(input[0] != c, ParseError({ input[0] }, { c }));
+            CPPARSEC_FAIL_IF(input[0] != c, ParseError(input[0], c));
 
             input.remove_prefix(1);
             return c;
@@ -498,8 +502,7 @@ namespace cpparsec {
     // Parse one or more characters, std::string specialization
     Parser<std::string> many1(Parser<char> charP) {
         return CPPARSEC_DEFN(std::string) {
-            CPPARSEC_SAVE(first, charP);
-            CPPARSEC_SAVE(values, helper::many_accumulator(charP, std::string(1, first)));
+            CPPARSEC_SAVE(values, helper::many_accumulator(charP, std::string(1, 'c')));
 
             return values;
         };
@@ -759,7 +762,7 @@ namespace cpparsec {
                 auto start_point = CPPARSEC_GET_INPUT_DATA;
                 ParseResult<std::function<T(T, T)>> f = CPPARSEC_PARSERESULT(op);
                 if (!f) {
-                    CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA, ParseError("chainl1", "chainl1"));
+                    CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA, f.error());
                     break;
                 }
                 CPPARSEC_SAVE(arg2, arg);
@@ -918,9 +921,18 @@ struct std::formatter<cpparsec::ErrorContent> {
         return ctx.begin();
     }
 
-    auto format(const cpparsec::ErrorContent& err, std::format_context& ctx) const {
-        return err.has_value() 
-            ? std::format_to(ctx.out(), "Expected \"{}\", found \"{}\"", err->first, err->second)
-            : std::format_to(ctx.out(), "{}", err.error());
+    auto format(const cpparsec::ErrorContent& error, std::format_context& ctx) const {
+        return std::visit([&ctx](auto&& err) {
+            using T = std::decay_t<decltype(err)>;
+            if constexpr (std::is_same_v<T, std::pair<std::string, std::string>>) {
+                return std::format_to(ctx.out(), "Expected \"{}\", found \"{}\"", err.first, err.second);
+            }
+            else if constexpr (std::is_same_v<T, std::pair<char, char>>) {
+                return std::format_to(ctx.out(), "Expected '{}', found '{}'", err.first, err.second);
+            }
+            else if constexpr (std::is_same_v<T, std::string>) {
+                return std::format_to(ctx.out(), "{}", err);
+            }
+        }, error);
     }
 };

@@ -127,7 +127,8 @@ void time_parse(Parser<T> p, int cases, string&& test, string&& msg = "") {
 
 
 int main() {
-    time_parse(char_('x'), 1500000, "x", "basic extra error");
+    time_parse(string_("test"), 1000000, "test", "basic extra error");
+    time_parse(char_('x') & char_('x') & char_('x') & char_('x') & char_('x') & char_('x') & char_('x') & char_('x'), 4500000, "xxxxxxxx", "basic extra error");
 }
 void test1() {
 
