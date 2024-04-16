@@ -6,7 +6,6 @@
 using namespace cpparsec;
 using namespace std;
 
-
 //// Parses a single string
 //Parser<std::string> string2_(const std::string& str) {
 //    return Parser<std::string>([=](InputStream& input) -> ParseResult<std::string> {
@@ -110,7 +109,7 @@ void time_parse(Parser<T> p, int cases, string&& test, string&& msg = "") {
 
 	auto end = std::chrono::high_resolution_clock::now();
 
-	println("okayp: {} {}\n", duration_cast<std::chrono::milliseconds>(end - start), msg);
+	println("okay:  {} {}\n", duration_cast<std::chrono::milliseconds>(end - start), msg);
 
     start = std::chrono::high_resolution_clock::now();
 
@@ -125,11 +124,12 @@ void time_parse(Parser<T> p, int cases, string&& test, string&& msg = "") {
     println("error: {} {}\n", duration_cast<std::chrono::milliseconds>(end - start), msg);
 }
 
-
 int main() {
-    time_parse(string_("test"), 1000000, "test", "basic extra error");
-    time_parse(char_('x') & char_('x') & char_('x') & char_('x') & char_('x') & char_('x') & char_('x') & char_('x'), 4500000, "xxxxxxxx", "basic extra error");
+    time_parse(string_("test"), 1000000, "test", "test");
+    time_parse(char_('x') & char_('x') & char_('x') & char_('x') & char_('x') & char_('x') & char_('x') & char_('x'), 1000000, "xxxxxxxx", "xs");
+    time_parse(try_(string_("ttttttttwo")) | string_("tttttttthree"), 1000000, "tttttttthree", "try");
 }
+
 void test1() {
 
 }

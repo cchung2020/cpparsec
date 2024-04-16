@@ -31,7 +31,7 @@ BOOST_AUTO_TEST_CASE(Char_Parser_Failure)
     ParseResult<char> result = char_('A').parse(input);
 
     BOOST_REQUIRE(!result.has_value());
-    BOOST_CHECK(result.error().message() == "Expected \"a\", found \"A\"");
+    BOOST_CHECK(result.error().message() == "Expected 'a', found 'A'");
 }
 
 BOOST_AUTO_TEST_CASE(Char_And_Operator)
@@ -103,10 +103,9 @@ BOOST_AUTO_TEST_CASE(String_Parser_Failure)
     ParseResult<string> result = string_("finished").parse("finishes");
 
     BOOST_REQUIRE(!result.has_value()); // Got 's', wanted 'd'. 
-    println("{}", result.error().message_stack());
-    BOOST_CHECK(result.error().message() == "Expected \"d\", found \"s\"");
+    BOOST_CHECK(result.error().message() == "Expected 'd', found 's'");
     BOOST_CHECK(result.error().message_stack() ==
-        "Expected \"d\", found \"s\"\n"
+        "Expected 'd', found 's'\n"
         "Expected \"finished\", found \"finishes\"");
 }
 

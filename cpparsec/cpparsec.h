@@ -55,10 +55,10 @@ namespace cpparsec {
             : expected_found({ err })
         {}
         ParseError(std::string&& expected, std::string&& found)
-            : expected_found({ ErrorContent{std::pair{expected, found}} })
+            : expected_found({ ErrorContent{std::pair {expected, found}} })
         {}
         ParseError(char expected, char found)
-            : expected_found({ ErrorContent{std::pair{std::string{expected}, std::string{found}}} })
+            : expected_found({ ErrorContent{std::pair{expected, found}} })
         {}
         ParseError(std::string&& msg)
             : expected_found({ ErrorContent{msg} })
@@ -188,12 +188,12 @@ namespace cpparsec {
         Parser<T> try_() {
             return Parser<T>([=, captureParser = parser](InputStream& input) -> ParseResult<T> {
                 auto starting_input = input;
-                if (ParseResult<T> result = captureParser(input)) {
-                    return result;
+                ParseResult<T> result = captureParser(input);
+                if (!result) {
+                    input = starting_input; // undo input consumption
                 }
 
-                input = starting_input; // undo input consumption
-                CPPARSEC_FAIL_IF(true, ParseError("try_", "try_"));
+                return result;
             });
         }
 
@@ -322,7 +322,7 @@ namespace cpparsec {
                     input.remove_prefix(i);
 
                     CPPARSEC_FAIL(std::vector({
-                        ErrorContent{ std::pair{ std::string{c}, std::string{c2} }},
+                        ErrorContent{ std::pair{ c, c2 }},
                         ErrorContent{ std::pair{ str, str2 } }
                     }));
                 }
@@ -362,9 +362,11 @@ namespace cpparsec {
                         values.push_back(*result);
                         continue;
                     }
-                    // consumptive fail, stop parsing
-                    CPPARSEC_FAIL_IF(starting_point != CPPARSEC_GET_INPUT_DATA, ParseError("many_acc", "many_acc"));
-                    break;
+                    else {
+                        // consumptive fail, stop parsing
+                        CPPARSEC_FAIL_IF(starting_point != CPPARSEC_GET_INPUT_DATA, result.error());
+                        break;
+                    }
                 }
 
                 return values;
@@ -502,7 +504,8 @@ namespace cpparsec {
     // Parse one or more characters, std::string specialization
     Parser<std::string> many1(Parser<char> charP) {
         return CPPARSEC_DEFN(std::string) {
-            CPPARSEC_SAVE(values, helper::many_accumulator(charP, std::string(1, 'c')));
+            CPPARSEC_SAVE(first, charP);
+            CPPARSEC_SAVE(values, helper::many_accumulator(charP, std::string({first})));
 
             return values;
         };
@@ -918,17 +921,17 @@ struct std::formatter<cpparsec::ErrorContent> {
     // for debugging only
 
     auto parse(std::format_parse_context& ctx) {
-        return ctx.begin();
+        return ctx.end();
     }
 
     auto format(const cpparsec::ErrorContent& error, std::format_context& ctx) const {
         return std::visit([&ctx](auto&& err) {
             using T = std::decay_t<decltype(err)>;
-            if constexpr (std::is_same_v<T, std::pair<std::string, std::string>>) {
-                return std::format_to(ctx.out(), "Expected \"{}\", found \"{}\"", err.first, err.second);
-            }
-            else if constexpr (std::is_same_v<T, std::pair<char, char>>) {
+            if constexpr (std::is_same_v<T, std::pair<char, char>>) {
                 return std::format_to(ctx.out(), "Expected '{}', found '{}'", err.first, err.second);
+            }
+            else if constexpr (std::is_same_v<T, std::pair<std::string, std::string>>) {
+                return std::format_to(ctx.out(), "Expected \"{}\", found \"{}\"", err.first, err.second);
             }
             else if constexpr (std::is_same_v<T, std::string>) {
                 return std::format_to(ctx.out(), "{}", err);
