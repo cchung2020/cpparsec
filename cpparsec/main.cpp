@@ -142,9 +142,9 @@ void time_parse(Parser<T> p, int cases, string&& test, string&& msg = "") {
         if (!result)
         {
             //result.error()().message_stack();
-            //if (i == 0) {
-            //    println("{}", result.error()().message_stack());
-            //}
+            if (i == 0) {
+                println("{}", result.error()().message_stack());
+            }
         }
     }
     end = chrono::high_resolution_clock::now();

@@ -64,12 +64,10 @@ namespace cpparsec {
         ParseError(std::string&& msg)
             : expected_found({ ErrorContent{msg} })
         {}
-        ParseError(std::vector<ErrorContent>&& errs)
-            : expected_found(errs)
-        {}
 
-        void add_error(ErrorContent&& err) {
+        ParseError& add_error(ErrorContent&& err) {
             expected_found.push_back(err);
+            return *this;
         }
 
         std::string message() {
@@ -324,11 +322,11 @@ namespace cpparsec {
                     auto str2 = std::string(input.substr(0, i + 1));
                     input.remove_prefix(i);
 
-                    //CPPARSEC_FAIL(ParseError(c, c2));
-                    CPPARSEC_FAIL(std::vector({
-                        ErrorContent{ std::pair{ c, c2 } },
-                        ErrorContent{ std::pair{ str, str2 } }
-                    }));
+                    CPPARSEC_FAIL(ParseError(c, c2).add_error(ErrorContent{ std::pair{ str, str2 } }));
+                    //CPPARSEC_FAIL(std::vector({
+                    //    ErrorContent{ std::pair{ c, c2 } },
+                    //    ErrorContent{ std::pair{ str, str2 } }
+                    //}));
                 }
             }
 
