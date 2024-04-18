@@ -55,7 +55,7 @@ namespace cpparsec {
         ParseError(ErrorContent&& err)
             : expected_found({ err })
         {}
-        ParseError(std::string&& expected, std::string&& found)
+        ParseError(const std::string expected, const std::string found)
             : expected_found({ ErrorContent{std::pair {expected, found}} })
         {}
         ParseError(char expected, char found)
@@ -374,10 +374,10 @@ namespace cpparsec {
 
     // Parses a single character that satisfies a constraint
     // Faster than try_(any_char().satisfy(cond))
-    Parser<char> char_satisfy(std::function<bool(char)> cond) {
+    Parser<char> char_satisfy(std::function<bool(char)> cond, std::string&& err_msg = "<char_satisfy>") {
         return CPPARSEC_DEFN(char) {
-            CPPARSEC_FAIL_IF(input.empty(), ParseError("char_satisfy: unexpected end of input"));
-            CPPARSEC_FAIL_IF(!cond(input[0]), ParseError("<char_satisfy>", { input[0] }));
+            CPPARSEC_FAIL_IF(input.empty(), ParseError(err_msg, "end of input"));
+            CPPARSEC_FAIL_IF(!cond(input[0]), ParseError(err_msg, { input[0] }));
 
             char c = input[0];
             input.remove_prefix(1);
@@ -387,12 +387,12 @@ namespace cpparsec {
 
     // Parses a single letter
     Parser<char> letter() {
-        return char_satisfy(isalpha) ^ "Expected a letter";
+        return char_satisfy(isalpha, "Expected a letter");
     }
 
     // Parses a single digit
     Parser<char> digit() {
-        return char_satisfy(isdigit) ^ "Expected a digit" ^ "Expected a digit";
+        return char_satisfy(isdigit, "Expected a digit");
     }
 
     // Parses a single digit
