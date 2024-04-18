@@ -125,19 +125,19 @@ void time_parse(Parser<T> p, int cases, string&& test, string&& msg = "") {
     auto start = chrono::high_resolution_clock::now();
 
     for (int i = 0; i < cases; i++) {
-        ParseResult<T> result = p.parse(test);
+        p.parse(test);
     }
 
     auto end = chrono::high_resolution_clock::now();
 
-    println("okay:  {} {}\n", duration_cast<chrono::milliseconds>(end - start), msg);
+    println("okay:  {} {}", duration_cast<chrono::milliseconds>(end - start), msg);
 
     start = chrono::high_resolution_clock::now();
 
     test.back() = 0;
 
     for (int i = 0; i < cases; i++) {
-        ParseResult<T> result = p.parse(test);
+        p.parse(test);
     }
 
     end = chrono::high_resolution_clock::now();
@@ -149,11 +149,12 @@ int main() {
     //time_parse(many(between(char_('a'), char_('c'), char_('b'))), 2000000, "abbbbbc", "between ab...c");
     //time_parse(many(between2(char_('a'), char_('c'), char_('b'))), 2000000, "abbbbbc", "between ab...c");
     time_parse(int_(), 200000, "12345123", "tttt");
-    time_parse(int_(), 200000, "a12345123", "tttt");
-    time_parse(many1(digit()).transform<int>(helper::stoi), 200000, "12345123", "tttt");
-    time_parse(many1(digit()).transform<int>(helper::stoi), 200000, "a12345123", "tttt");
-    time_parse(many1(digit2()).transform<int>(helper::stoi), 200000, "12345123", "tttt");
-    time_parse(many1(digit2()).transform<int>(helper::stoi), 200000, "a12345123", "tttt");
+    //time_parse(int_(), 200000, "a12345123", "tttterr");
+    time_parse(int2_(), 200000, "12345123", "2tttt");
+    time_parse(int_(), 200000, "12345123", "tttt");
+    //time_parse(int_(), 200000, "a12345123", "tttterr");
+    time_parse(int2_(), 200000, "12345123", "2tttt");
+    //time_parse(int2_(), 200000, "a12345123", "2tttterr");
     //time_parse(string2_("tttttttt"), 2000000, "tttttttthree", "tttt");
     //time_parse(string_("tttt") & string_("tttt"), 2000000, "tttttttthree", "tt tt");
     //time_parse(string2_("tttt") & string2_("tttt"), 2000000, "tttttttthree", "tt tt");

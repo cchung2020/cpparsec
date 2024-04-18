@@ -278,11 +278,10 @@ namespace cpparsec {
     template <typename T>
     Parser<T> operator^(Parser<T>&& p, std::string&& msg) {
         return CPPARSEC_DEFN(T) {
-            ParseResult<T> result = CPPARSEC_PARSERESULT(p);
-            if (!result.has_value()) {
-                result.error().add_error({ msg });
-            }
-            return std::move(result);
+            return p.parse(input).transform_error([&](ParseError&& err) {
+                err.add_error({ msg });
+                return err;
+            });
         };
     }
 
@@ -832,6 +831,11 @@ namespace cpparsec {
     // Parses an int
     Parser<int> int_() {
         return many1(digit()).transform<int>(helper::stoi);
+    }
+
+    // Parses an int
+    Parser<int> int2_() {
+        return many1(digit2()).transform<int>(helper::stoi);
     }
 
     // << "ignore" operator returns the first result of two parsers
