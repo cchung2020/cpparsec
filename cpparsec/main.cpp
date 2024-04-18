@@ -176,9 +176,9 @@ int main() {
     //time_parse(int2_(), 200000, "12345123", "2tttt");
     //time_parse(int2_(), 200000, "a12345123", "2tttterr");
     // 
-    //time_parse(string_("tttttttt"), 2000000, "tttttttt", "tttt");
-    //time_parse(string_("tttt") & string_("tttt"), 2000000, "tttttttt", "tt tt");
-    //time_parse(string_("tt") & string_("tt") & string_("tt") & string_("tt"), 2000000, "tttttttt", "t t t t");
+    time_parse(string_("tttttttt"), 2000000, "tttttttt", "tttt");
+    time_parse(string_("tttt") & string_("tttt"), 2000000, "tttttttt", "tt tt");
+    time_parse(string_("tt") & string_("tt") & string_("tt") & string_("tt"), 2000000, "tttttttt", "t t t t");
     //
     //time_parse(string2_("tttttttt"), 2000000, "tttttttt", "2tttt");
     //time_parse(string2_("tttt") & string2_("tttt"), 2000000, "tttttttt", "2tt tt");

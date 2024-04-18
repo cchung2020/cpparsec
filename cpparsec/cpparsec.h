@@ -49,35 +49,35 @@ namespace cpparsec {
     struct ErrorContent : std::variant<std::pair<std::string, std::string>, std::pair<char, char>, std::string> { };
 
     struct ParseError {
-        std::vector<ErrorContent> expected_found;
+        std::vector<ErrorContent> errors;
         //std::vector<std::optional<std::string>> messages;
 
         ParseError(ErrorContent&& err)
-            : expected_found({ err })
+            : errors({ err })
         {}
         ParseError(const std::string expected, const std::string found)
-            : expected_found({ ErrorContent{std::pair {expected, found}} })
+            : errors({ ErrorContent{std::pair {expected, found}} })
         {}
         ParseError(char expected, char found)
-            : expected_found({ ErrorContent{std::pair{expected, found}} })
+            : errors({ ErrorContent{std::pair{expected, found}} })
         {}
         ParseError(std::string&& msg)
-            : expected_found({ ErrorContent{msg} })
+            : errors({ ErrorContent{msg} })
         {}
 
         ParseError& add_error(ErrorContent&& err) {
-            expected_found.push_back(err);
+            errors.push_back(err);
             return *this;
         }
 
         std::string message() {
-            return format("{}", expected_found[0]);
+            return format("{}", errors[0]);
         }
         std::string message_stack() {
-            std::string msg = format("{}", expected_found[0]);
+            std::string msg = format("{}", errors[0]);
 
-            for (size_t i = 1; i < expected_found.size(); i++) {
-                msg += format("\n{}", expected_found[i]);
+            for (size_t i = 1; i < errors.size(); i++) {
+                msg += format("\n{}", errors[i]);
             }
 
             return msg;
@@ -149,7 +149,12 @@ namespace cpparsec {
         // Parses self and other, returns pair of both results
         template<typename U>
         Parser<std::pair<T, U>> pair_with(Parser<U> other) const {
-            return *this & other;
+            return Parser<std::pair<T, U>>([=, selfParser = *this](InputStream& input)->ParseResult<std::pair<T, U>> {
+                CPPARSEC_SAVE(a, selfParser);
+                CPPARSEC_SAVE(b, other);
+
+                return std::pair(a, b);
+            });
         }
 
         // Parses occurence satisfying a condition
@@ -323,10 +328,6 @@ namespace cpparsec {
                     input.remove_prefix(i);
 
                     CPPARSEC_FAIL(ParseError(c, c2).add_error(ErrorContent{ std::pair{ str, str2 } }));
-                    //CPPARSEC_FAIL(std::vector({
-                    //    ErrorContent{ std::pair{ c, c2 } },
-                    //    ErrorContent{ std::pair{ str, str2 } }
-                    //}));
                 }
             }
 
@@ -345,12 +346,15 @@ namespace cpparsec {
 
                 while (true) {
                     auto starting_point = CPPARSEC_GET_INPUT_DATA;
-                    if (ParseResult<T> result = CPPARSEC_PARSERESULT(p)) {
+                    if (ParseResult<T> result = p.parse(input)) {
                         values.push_back(*result);
                         continue;
                     }
                     else {
                         // consumptive fail, stop parsing
+                        if (starting_point != input.data()) {
+                            return std::unexpected(result.error());
+                        }
                         //CPPARSEC_FAIL_IF(starting_point != CPPARSEC_GET_INPUT_DATA, result.error());
                         break;
                     }
@@ -397,7 +401,7 @@ namespace cpparsec {
 
     // Parses a single digit
     Parser<char> digit2() {
-        return char_satisfy(isdigit);
+        return char_satisfy(isdigit, "");
     }
 
     // Parses a single space
@@ -710,6 +714,11 @@ namespace cpparsec {
 
             return std::pair{ cubeNum, cubeColor };
         };
+    }
+
+    // return Parser<T>() = [](InputStream& input) -> ParseResult<T> ;
+    Parser<std::tuple<int, std::string>> cubeParser2() {
+        return (int_() << space()) & (string_("red") | string_("green") | string_("blue"));
     }
 
     // Parses a given parser, doesn't consume input on failure
