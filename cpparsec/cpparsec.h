@@ -27,8 +27,8 @@
         return std::unexpected(_cpparsec_skipresult.error());                    \
     }                                                                            \
 
-#define CPPARSEC_FAIL_IF(cond, message) if (cond) { return std::unexpected(message); }
-#define CPPARSEC_FAIL(message) return std::unexpected(message);
+#define CPPARSEC_FAIL_IF(cond, message) if (cond) { return std::unexpected(std::function([=]() { return message; })); }
+#define CPPARSEC_FAIL(message) return std::unexpected(std::function([=]() { return message; }));
 
 #define CPPARSEC_GET_INPUT input
 #define CPPARSEC_GET_INPUT_DATA input.data()
@@ -87,7 +87,7 @@ namespace cpparsec {
     };
 
     template<typename T>
-    using ParseResult = std::expected<T, ParseError>;
+    using ParseResult = std::expected<T, std::function<ParseError()>>;
 
     using InputStream = std::string_view;
 
@@ -277,11 +277,15 @@ namespace cpparsec {
     // Add an error message to the parse result if it fails
     template <typename T>
     Parser<T> operator^(Parser<T>&& p, std::string&& msg) {
+        //return p;
         return CPPARSEC_DEFN(T) {
-            return p.parse(input).transform_error([&](ParseError&& err) {
+            ParseResult<T> result = p.parse(input);
+            if (!result) {
+                ParseError err = result.error()();
                 err.add_error({ msg });
-                return err;
-            });
+                CPPARSEC_FAIL(err);
+            }
+            return result;
         };
     }
 
@@ -349,7 +353,7 @@ namespace cpparsec {
                     }
                     else {
                         // consumptive fail, stop parsing
-                        CPPARSEC_FAIL_IF(starting_point != CPPARSEC_GET_INPUT_DATA, result.error());
+                        //CPPARSEC_FAIL_IF(starting_point != CPPARSEC_GET_INPUT_DATA, result.error());
                         break;
                     }
                 }
@@ -375,7 +379,7 @@ namespace cpparsec {
     Parser<char> char_satisfy(std::function<bool(char)> cond) {
         return CPPARSEC_DEFN(char) {
             CPPARSEC_FAIL_IF(input.empty(), ParseError("char_satisfy: unexpected end of input"));
-            CPPARSEC_FAIL_IF(!cond(input[0]), ParseError({ input[0] }, "char_satisfy: failed"));
+            CPPARSEC_FAIL_IF(!cond(input[0]), ParseError("<char_satisfy>", { input[0] }));
 
             char c = input[0];
             input.remove_prefix(1);
@@ -390,7 +394,7 @@ namespace cpparsec {
 
     // Parses a single digit
     Parser<char> digit() {
-        return char_satisfy(isdigit) ^ "Expected a digit";
+        return char_satisfy(isdigit) ^ "Expected a digit" ^ "Expected a digit";
     }
 
     // Parses a single digit
