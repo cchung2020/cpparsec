@@ -1,5 +1,6 @@
 #define BOOST_TEST_MODULE cpparsec
 #include <boost/test/included/unit_test.hpp>
+#include <boost/cregex.hpp>
 #include "cpparsec.h"
 #include <algorithm>
 
@@ -123,7 +124,7 @@ BOOST_AUTO_TEST_CASE(Count_Parser_Success)
     ParseResult<vector<int>> result = count(5, int_() << optional_(space())).parse(input);
 
     BOOST_REQUIRE(result.has_value());
-    BOOST_CHECK(*result == vector({1, 2, 3, 4, 5}));
+    BOOST_CHECK(*result == vector({ 1, 2, 3, 4, 5 }));
     BOOST_CHECK(input == "6 7");
 }
 
@@ -135,7 +136,8 @@ BOOST_AUTO_TEST_CASE(Count_Parser_Failure)
     ParseResult<vector<int>> result = count(5, int_() << optional_(space())).parse(input);
 
     BOOST_REQUIRE(!result.has_value());
-    BOOST_CHECK(result.error().message() == "Unexpected end of input, failed satisfy. Expected a digit");
+    println("{}", result.error().message());
+    BOOST_CHECK(result.error().message() == "char_satisfy: unexpected end of input");
 }
 
 BOOST_AUTO_TEST_CASE(Count_Parser_Complex_Type)
@@ -256,7 +258,7 @@ BOOST_AUTO_TEST_CASE(SepBy_Parser_Success)
     ParseResult<vector<int>> result = spaced_ints.parse(input);
 
     BOOST_REQUIRE(result.has_value());
-    BOOST_CHECK(*result == vector({1, 2, 3, 4, 5}));
+    BOOST_CHECK(*result == vector({ 1, 2, 3, 4, 5 }));
 }
 
 BOOST_AUTO_TEST_CASE(SepBy1_Parser_Complex_Input)
@@ -268,7 +270,7 @@ BOOST_AUTO_TEST_CASE(SepBy1_Parser_Complex_Input)
     ParseResult<string> result = char_sepby_spaced_int.parse(input);
 
     BOOST_REQUIRE(result.has_value());
-    BOOST_CHECK(*result == std::string({'a', 'b', 'c', 'y', 'z'}));
+    BOOST_CHECK(*result == std::string({ 'a', 'b', 'c', 'y', 'z' }));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -285,7 +287,7 @@ BOOST_AUTO_TEST_CASE(ManyTill_Parser_Success)
     ParseResult<vector<int>> result = nums_till_excl.parse(input);
 
     BOOST_REQUIRE(result.has_value());
-    BOOST_CHECK(*result == vector({1, 2, 3, 4, 5}));
+    BOOST_CHECK(*result == vector({ 1, 2, 3, 4, 5 }));
     BOOST_CHECK(input == "...");
 }
 
@@ -406,7 +408,7 @@ BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(ChainL_Parsers)
 
-BOOST_AUTO_TEST_CASE(ChainL_Parser) 
+BOOST_AUTO_TEST_CASE(ChainL_Parser)
 {
     auto add_op = success(function<int(int, int)>([](int a, int b) { return a + b; }));
     auto mul_op = success(function<int(int, int)>([](int a, int b) { return a * b; }));
@@ -463,13 +465,13 @@ BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(LookAhead_NotFollowedBy_Parsers)
 
-BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser) 
+BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser)
 {
     auto partialParseNum = [](const string& word, int num) {
         return try_(
             look_ahead(string_(word)) >> char_(word[0]) >> success(num)
         );
-    };
+        };
 
     Parser<int> wordToNum =
         partialParseNum("one", 1)
@@ -505,7 +507,7 @@ BOOST_AUTO_TEST_SUITE_END()
 // --------------------------- Choice Parsers ---------------------------
 BOOST_AUTO_TEST_SUITE(Choice_Parsers)
 
-BOOST_AUTO_TEST_CASE(Choice_Parser_Multiple_Choices) 
+BOOST_AUTO_TEST_CASE(Choice_Parser_Multiple_Choices)
 {
     string inputStr = "two threeten two tenEND";
     string_view input = inputStr;
@@ -514,12 +516,12 @@ BOOST_AUTO_TEST_CASE(Choice_Parser_Multiple_Choices)
         try_(string_("two") >> spaces() >> success(2)),
         try_(string_("three") >> spaces() >> success(3)),
         try_(string_("ten") >> spaces() >> success(10)),
-    }));
+        }));
 
     ParseResult<vector<int>> result = many1(t_skeleton_nums).parse(input);
 
     BOOST_REQUIRE(result.has_value());
-    BOOST_CHECK(*result == vector({2, 3, 10, 2, 10}));
+    BOOST_CHECK(*result == vector({ 2, 3, 10, 2, 10 }));
     BOOST_CHECK(input == "END");
 }
 
