@@ -15,16 +15,16 @@
 #include <utility>
 
 //
-#define CPPARSEC_SAVE(var, ...)                    \
-    auto&& _##var##_ = (__VA_ARGS__).parse(input); \
-    if (!_##var##_.has_value()) {                  \
-        return std::unexpected(_##var##_.error()); \
-    }                                              \
+#define CPPARSEC_SAVE(var, ...)                               \
+    auto&& _##var##_ = (__VA_ARGS__).parse(input);            \
+    if (!_##var##_.has_value()) {                             \
+        return std::unexpected(std::move(_##var##_.error())); \
+    }                                                         \
     auto&& var = _##var##_.value();
 
 #define CPPARSEC_SKIP(p) \
     if (auto&& _cpparsec_skipresult = (p).parse(input); !_cpparsec_skipresult) { \
-        return std::unexpected(_cpparsec_skipresult.error());                    \
+        return std::unexpected(std::move(_cpparsec_skipresult.error()));         \
     }                                                                            \
 
 #define CPPARSEC_FAIL_IF(cond, message) if (cond) { return std::unexpected([=]() { return message; }); }
@@ -46,7 +46,7 @@ using std::println, std::format, std::string, std::string_view;
 
 
 namespace cpparsec {
-    struct ErrorContent : std::variant<std::pair<std::string, std::string>, std::pair<char, char>, std::string> { };
+    struct ErrorContent : std::variant < std::pair<std::string, std::string>, std::pair<char, char>, std::string, std::monostate > { };
 
     struct ParseError {
         std::vector<ErrorContent> errors;
@@ -943,9 +943,12 @@ struct std::formatter<cpparsec::ErrorContent> {
             }
             else if constexpr (std::is_same_v<T, std::pair<std::string, std::string>>) {
                 return std::format_to(ctx.out(), "Expected \"{}\", found \"{}\"", err.first, err.second);
-            }   
+            }
             else if constexpr (std::is_same_v<T, std::string>) {
                 return std::format_to(ctx.out(), "{}", err);
+            }
+            else if constexpr (std::is_same_v<T, std::monostate>) {
+                return std::format_to(ctx.out(), "empty error");
             }
         }, error);
     }
