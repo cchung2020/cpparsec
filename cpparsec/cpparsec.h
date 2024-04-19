@@ -27,8 +27,8 @@
         return std::unexpected(_cpparsec_skipresult.error());                    \
     }                                                                            \
 
-#define CPPARSEC_FAIL_IF(cond, message) if (cond) { return std::unexpected(std::function([=]() { return message; })); }
-#define CPPARSEC_FAIL(message) return std::unexpected(std::function([=]() { return message; }));
+#define CPPARSEC_FAIL_IF(cond, message) if (cond) { return std::unexpected([=]() { return message; }); }
+#define CPPARSEC_FAIL(message) return std::unexpected([=]() { return message; });
 
 #define CPPARSEC_GET_INPUT input
 #define CPPARSEC_GET_INPUT_DATA input.data()
@@ -92,7 +92,7 @@ namespace cpparsec {
     template<typename T>
     class Parser {
     public:
-        using ParseFunction = std::function<ParseResult<T>(InputStream&)>;
+        using ParseFunction = std::function<ParseResult<T>(InputStream&)>; // ParseResult<T>(*)(InputStream&)
 
     private:
         ParseFunction parser;
@@ -376,9 +376,16 @@ namespace cpparsec {
             });
     }
 
+
+    // Concept for a function taking any type and returning a result convertible to bool
+    template<typename Pred, typename Arg>
+    concept UnaryPredicate = requires(Pred f, Arg a) {
+        { f(a) } -> std::convertible_to<bool>;
+    };
+
     // Parses a single character that satisfies a constraint
     // Faster than try_(any_char().satisfy(cond))
-    Parser<char> char_satisfy(std::function<bool(char)> cond, std::string&& err_msg = "<char_satisfy>") {
+    Parser<char> char_satisfy(UnaryPredicate<char> auto cond, std::string&& err_msg = "<char_satisfy>") {
         return CPPARSEC_DEFN(char) {
             CPPARSEC_FAIL_IF(input.empty(), ParseError(err_msg, "end of input"));
             CPPARSEC_FAIL_IF(!cond(input[0]), ParseError(err_msg, { input[0] }));

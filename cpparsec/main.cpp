@@ -139,51 +139,22 @@ void time_parse(Parser<T> p, int cases, string&& test, string&& msg = "") {
     test.back() = 0;
     for (int i = 0; i < cases; i++) {
         ParseResult<T> result = p.parse(test);
-        if (!result)
-        {
-            //result.error()().message_stack();
-        }
     }
     end = chrono::high_resolution_clock::now();
     println("error: {} {}\n", duration_cast<chrono::milliseconds>(end - start), msg);
 }
 
 int main() {
-    //auto p = string_("exam");
-
-    //auto result = p.parse("exadd");
-    //if (result) {
-    //    println("{}", *result);
-    //}
-    //else {
-    //    ParseError x = result.error()();
-    //    println("{}", result.error()().message_stack());
-    //}
-
-    //time_parse(many(between(char_('a'), char_('c'), char_('b'))), 2000000, "abbbbbc", "between ab...c");
-    //time_parse(many(between2(char_('a'), char_('c'), char_('b'))), 2000000, "abbbbbc", "between ab...c");
-    time_parse(int_(), 200000, "12345123", "regular int, 12345123");
-    time_parse(int_(), 200000, "a12345123", "regular int, a12345123 (err)");
-    time_parse(int2_(), 200000, "12345123", "fast int, 12345123");
-    time_parse(int2_(), 200000, "a12345123", "fast int, a12345123 (err)");
-    //if (auto result = int_().parse("a12345123"); !result) {
-    //    println("{} [fast int]\n", result.error()().message_stack());
-    //}
-    //if (auto result = int2_().parse("a12345123"); !result) {
-    //    println("{}", result.error()().message_stack());
-    //}
-    //time_parse(int_(), 200000, "a12345123", "tttterr");
-    //time_parse(int2_(), 200000, "12345123", "2tttt");
-    //time_parse(int2_(), 200000, "a12345123", "2tttterr");
-    // 
+    time_parse(int2_(), 2000000, "12345123", "fast int, 12345123");
+    time_parse(int2_(), 2000000, "a12345123", "fast int, a12345123 (err)");
+    time_parse(int_(), 2000000, "12345123", "regular int, 12345123");
+    time_parse(int_(), 2000000, "a12345123", "regular int, a12345123 (err)");
+    time_parse(int2_(), 2000000, "12345123", "fast int, 12345123");
+    time_parse(int2_(), 2000000, "a12345123", "fast int, a12345123 (err)");
+    time_parse(int_(), 2000000, "12345123", "regular int, 12345123");
+    time_parse(int_(), 2000000, "a12345123", "regular int, a12345123 (err)");
     time_parse(string_("tttttttt"), 2000000, "tttttttt", "tttt");
     time_parse(string_("tttt") & string_("tttt"), 2000000, "tttttttt", "tt tt");
-    time_parse(string_("tt") & string_("tt") & string_("tt") & string_("tt"), 2000000, "tttttttt", "t t t t");
-    //
-    //time_parse(string2_("tttttttt"), 2000000, "tttttttt", "2tttt");
-    //time_parse(string2_("tttt") & string2_("tttt"), 2000000, "tttttttt", "2tt tt");
-    //time_parse(string2_("tt") & string2_("tt") & string2_("tt") & string2_("tt"), 2000000, "tttttttt", "2t t t t");
-    //time_parse(char_('t') & char_('t') & char_('t') & char_('t') & char_('t') & char_('t') & char_('t') & char_('t'), 2000000, "tttttttt", "char t t t t");
 }
 
 void test1() {
