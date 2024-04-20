@@ -14,7 +14,7 @@
 #include <variant>
 #include <utility>
 
-//
+// helps with
 #define CPPARSEC_SAVE(var, ...)                               \
     auto&& _##var##_ = (__VA_ARGS__).parse(input);            \
     if (!_##var##_.has_value()) {                             \
@@ -46,7 +46,7 @@ using std::println, std::format, std::string, std::string_view;
 
 
 namespace cpparsec {
-    struct ErrorContent : std::variant < std::pair<std::string, std::string>, std::pair<char, char>, std::string, std::monostate > { };
+    struct ErrorContent : std::variant <std::pair<std::string, std::string>, std::pair<char, char>, std::string, std::monostate> { };
 
     struct ParseError {
         std::vector<ErrorContent> errors;
@@ -166,6 +166,7 @@ namespace cpparsec {
                 return result;
                 });
         }
+
         // Parse occurence between two parses
         template<typename O, typename C>
         Parser<T> between(Parser<O> open, Parser<C> close) const {
@@ -200,14 +201,21 @@ namespace cpparsec {
                 });
         }
 
-        // Apply a function to the parse result
-        template <typename U>
-        auto transform(std::function<U(T)> func) const {
+        template <typename U, typename F>
+        Parser<U> transform(F func) const {
             return Parser<U>([=, captureParser = parser](InputStream& input) -> ParseResult<U> {
-                ParseResult<T> result = captureParser(input);
-                return result.transform(func);
-                });
+                return captureParser(input).transform(func); 
+            });
         }
+
+        //// Apply a function to the parse result
+        //template <typename U>
+        //Parser<U> transform(std::function<U(T)> func) const {
+        //    return Parser<U>([=, captureParser = parser](InputStream& input) -> ParseResult<U> {
+        //        ParseResult<T> result = captureParser(input);
+        //        return result.transform(func);
+        //        });
+        //}
     };
 
     template <typename T>
@@ -296,7 +304,7 @@ namespace cpparsec {
     template <typename T>
     Parser<T> operator%(Parser<T> p, std::string&& msg) {
         return CPPARSEC_DEFN(T) {
-            ParseResult<T> result = CPPARSEC_PARSERESULT(p);
+            ParseResult<T> result = p.parse(input);
             if (!result.has_value()) {
                 result.error() = ParseError(msg);
             }
@@ -353,9 +361,8 @@ namespace cpparsec {
                     else {
                         // consumptive fail, stop parsing
                         if (starting_point != input.data()) {
-                            return std::unexpected(result.error());
+                            return std::unexpected(std::move(result.error()));
                         }
-                        //CPPARSEC_FAIL_IF(starting_point != CPPARSEC_GET_INPUT_DATA, result.error());
                         break;
                     }
                 }
