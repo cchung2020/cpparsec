@@ -145,6 +145,15 @@ void time_parse(Parser<T> p, int cases, string&& test, string&& msg = "") {
 }
 
 int main() {
+    //time_parse(string_("a1").or_(string_("a2")).or_(string_("a3")).or_(string_("a4")), 2000000, "a4", "tttt");
+    //time_parse(string_("a1").or_(string_("a2")).or_(string_("a4")).or_(string_("a3")), 2000000, "a4", "tttt");
+    //time_parse(string_("a1").or_(string_("a4")).or_(string_("a2")).or_(string_("a4")), 2000000, "a4", "tttt");
+    //time_parse(string_("a4").or_(string_("a1")).or_(string_("a3")).or_(string_("a4")), 2000000, "a4", "tttt");
+    //time_parse(char_('1').or_(char_('2')).or_(char_('3')).or_(char_('4')), 2000000, "4", "4444");
+    //time_parse(char_('1').or_(char_('2')).or_(char_('4')).or_(char_('3')), 2000000, "4", "4444");
+    //time_parse(char_('1').or_(char_('4')).or_(char_('2')).or_(char_('4')), 2000000, "4", "4444");
+    //time_parse(char_('4').or_(char_('1')).or_(char_('3')).or_(char_('4')), 2000000, "4", "4444");
+
     time_parse(int2_(), 2000000, "12345123", "fast int, 12345123");
     time_parse(int2_(), 2000000, "a12345123", "fast int, a12345123 (err)");
     time_parse(int_(), 2000000, "12345123", "regular int, 12345123");
@@ -153,8 +162,12 @@ int main() {
     time_parse(int2_(), 2000000, "a12345123", "fast int, a12345123 (err)");
     time_parse(int_(), 2000000, "12345123", "regular int, 12345123");
     time_parse(int_(), 2000000, "a12345123", "regular int, a12345123 (err)");
-    time_parse(string_("tttttttt"), 2000000, "tttttttt", "tttt");
-    time_parse(string_("tttt") & string_("tttt"), 2000000, "tttttttt", "tt tt");
+
+    //time_parse(string_("tttttwo").or_(string_("ttttthree")), 2000000, "ttttthree", "tttt");
+    //time_parse(string_("tttttwo").or_(string_("ttttthree")), 2000000, "tttttwo", "tttt");
+    //time_parse(string_("tttt") & string_("tttt"), 2000000, "tttttttt", "tt tt");
+    //time_parse(string_("tttttttt"), 2000000, "tttttttt", "tttt");
+    //time_parse(string_("tttt") & string_("tttt"), 2000000, "tttttttt", "tt tt");
 }
 
 void test1() {

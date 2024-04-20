@@ -14,7 +14,6 @@
 #include <variant>
 #include <utility>
 
-// helps with
 #define CPPARSEC_SAVE(var, ...)                               \
     auto&& _##var##_ = (__VA_ARGS__).parse(input);            \
     if (!_##var##_.has_value()) {                             \
@@ -127,44 +126,44 @@ namespace cpparsec {
         // Parses self and other, returns result of other
         template<typename U>
         Parser<U> with(Parser<U> other) const {
-            return Parser<U>([=, selfParser = *this](InputStream& input) -> ParseResult<U> {
-                CPPARSEC_SKIP(selfParser);
+            return CPPARSEC_DEFN_METHOD(thisParser, U) {
+                CPPARSEC_SKIP(thisParser);
                 CPPARSEC_SAVE(result, other);
 
                 return result;
-                });
+            };
         }
 
         // Parses self and other, returns result of self
         template<typename U>
         Parser<T> skip(Parser<U> other) const {
-            return Parser<T>([=, selfParser = *this](InputStream& input) -> ParseResult<T> {
-                CPPARSEC_SAVE(result, selfParser);
+            return CPPARSEC_DEFN_METHOD(thisParser, T) {
+                CPPARSEC_SAVE(result, thisParser);
                 CPPARSEC_SKIP(other);
 
                 return result;
-                });
+            };
         }
 
         // Parses self and other, returns pair of both results
         template<typename U>
         Parser<std::pair<T, U>> pair_with(Parser<U> other) const {
-            return Parser<std::pair<T, U>>([=, selfParser = *this](InputStream& input)->ParseResult<std::pair<T, U>> {
-                CPPARSEC_SAVE(a, selfParser);
+            return CPPARSEC_DEFN_METHOD(thisParser, std::pair<T, U>) {
+                CPPARSEC_SAVE(a, thisParser);
                 CPPARSEC_SAVE(b, other);
 
                 return std::pair(a, b);
-            });
+            };
         }
 
         // Parses occurence satisfying a condition
         Parser<T> satisfy(std::function<bool(T)> cond) const {
-            return Parser<T>([=, captureParser = parser](InputStream& input) -> ParseResult<T> {
-                auto result = captureParser(input);
+            return CPPARSEC_DEFN_METHOD(thisParser, T) {
+                ParseResult<T> result = thisParser(input);
                 CPPARSEC_FAIL_IF(!result || !cond(*result), format("Failed satisfy"));
 
                 return result;
-                });
+            };
         }
 
         // Parse occurence between two parses
@@ -176,9 +175,9 @@ namespace cpparsec {
         // | "or" operator parses the left parser, then the right parser if the left one fails without consuming
         template <typename T>
         Parser<T> or_(const Parser<T>& right) const {
-            return Parser<T>([=, captureParser = parser](InputStream& input) -> ParseResult<T> {
+            return CPPARSEC_DEFN_METHOD(thisParser, T) {
                 auto starting_input = input;
-                if (auto result = captureParser(input)) {
+                if (ParseResult<T> result = thisParser.parse(input)) {
                     return result;
                 }
                 else if (starting_input.data() != input.data()) {
@@ -186,36 +185,37 @@ namespace cpparsec {
                 }
 
                 return right.parse(input);
-                });
+            };
         }
 
+        // Parses p without consuming input on failure
         Parser<T> try_() {
-            return Parser<T>([=, captureParser = parser](InputStream& input) -> ParseResult<T> {
+            return CPPARSEC_DEFN_METHOD(thisParser, T) {
                 auto starting_input = input;
-                ParseResult<T> result = captureParser(input);
+                ParseResult<T> result = thisParser.parse(input);
                 if (!result) {
                     input = starting_input; // undo input consumption
                 }
 
                 return result;
-                });
+            };
         }
 
-        template <typename U, typename F>
-        Parser<U> transform(F func) const {
-            return Parser<U>([=, captureParser = parser](InputStream& input) -> ParseResult<U> {
-                return captureParser(input).transform(func); 
-            });
-        }
-
-        //// Apply a function to the parse result
-        //template <typename U>
-        //Parser<U> transform(std::function<U(T)> func) const {
+        //template <typename U, typename F>
+        //Parser<U> transform(F func) const {
         //    return Parser<U>([=, captureParser = parser](InputStream& input) -> ParseResult<U> {
-        //        ParseResult<T> result = captureParser(input);
-        //        return result.transform(func);
-        //        });
+        //        return captureParser(input).transform(func); 
+        //    });
         //}
+
+        // Apply a function to the parse result
+        template <typename U>
+        Parser<U> transform(std::function<U(T)> func) const {
+            return CPPARSEC_DEFN_METHOD(thisParser, U) {
+                ParseResult<T> result = thisParser.parse(input);
+                return result.transform(func);
+            };
+        }
     };
 
     template <typename T>
@@ -405,22 +405,22 @@ namespace cpparsec {
 
     // Parses a single letter
     Parser<char> letter() {
-        return char_satisfy(isalpha, "Expected a letter");
+        return char_satisfy(isalpha, "<letter>");
     }
 
     // Parses a single digit
     Parser<char> digit() {
-        return char_satisfy(isdigit, "Expected a digit");
+        return char_satisfy(isdigit, "<digit>");
     }
 
     // Parses a single digit
     Parser<char> digit2() {
-        return char_satisfy(isdigit, "");
+        return char_satisfy(isdigit);
     }
 
     // Parses a single space
     Parser<char> space() {
-        return char_satisfy(isspace) ^ "Expected a space";
+        return char_satisfy(isspace, "<space>");
     }
 
     template <typename T>
@@ -480,7 +480,7 @@ namespace cpparsec {
     template <typename T = std::monostate>
     Parser<T> unexpected() {
         return CPPARSEC_DEFN(T) {
-            return std::unexpected(ParseError("unexpected!", "unexpected!"));
+            CPPARSEC_FAIL(ParseError("unexpected"));
         };
     }
 
@@ -778,7 +778,7 @@ namespace cpparsec {
                 auto start_point = CPPARSEC_GET_INPUT_DATA;
                 ParseResult<std::function<T(T, T)>> f = CPPARSEC_PARSERESULT(op);
                 if (!f) {
-                    CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA, f.error());
+                    CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA, f.error()());
                     break;
                 }
                 CPPARSEC_SAVE(arg2, arg);
