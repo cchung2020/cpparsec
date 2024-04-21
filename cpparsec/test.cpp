@@ -246,6 +246,7 @@ BOOST_AUTO_TEST_CASE(Many1_Parser_Failure)
 BOOST_AUTO_TEST_SUITE_END()
 
 // --------------------------- SepBy Parsers ---------------------------
+
 BOOST_AUTO_TEST_SUITE(SepBy_Parsers)
 
 BOOST_AUTO_TEST_CASE(SepBy_Parser_Success)
@@ -275,6 +276,7 @@ BOOST_AUTO_TEST_CASE(SepBy1_Parser_Complex_Input)
 BOOST_AUTO_TEST_SUITE_END()
 
 // --------------------------- ManyTill Parsers ---------------------------
+
 BOOST_AUTO_TEST_SUITE(ManyTill_Parsers)
 
 BOOST_AUTO_TEST_CASE(ManyTill_Parser_Success)
@@ -320,6 +322,7 @@ BOOST_AUTO_TEST_CASE(ManyTill_Parser_Complex_Type)
 BOOST_AUTO_TEST_SUITE_END()
 
 // --------------------------- TryOr Parsers ---------------------------
+
 BOOST_AUTO_TEST_SUITE(TryOr_Parsers)
 
 BOOST_AUTO_TEST_CASE(TryOr_Parser_Success)
@@ -382,6 +385,7 @@ BOOST_AUTO_TEST_CASE(Int_Parser_Failure)
 BOOST_AUTO_TEST_SUITE_END()
 
 // --------------------------- Optional Result Parsers ---------------------------
+
 BOOST_AUTO_TEST_SUITE(Optional_Result_Parsers)
 
 BOOST_AUTO_TEST_CASE(Optional_Result_Parser_Int)
