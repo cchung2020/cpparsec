@@ -21,25 +21,34 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="alt.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Test.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="examples.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="cpparsec.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cpparsec_numeric.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cpparsec_char.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="examples.cpp">
+      <Filter>Examples</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cpparsec.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="expressions.h">
-      <Filter>Examples</Filter>
+    <ClInclude Include="cpparsec_numeric.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cpparsec_char.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cpparsec_core.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

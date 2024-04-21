@@ -1,8 +1,10 @@
 #define BOOST_TEST_MODULE cpparsec
+
+#include <algorithm>
 #include <boost/test/included/unit_test.hpp>
 #include <boost/cregex.hpp>
 #include "cpparsec.h"
-#include <algorithm>
+#include "cpparsec_numeric.h"
 
 using namespace cpparsec;
 using std::string, std::string_view, std::vector, std::tuple, std::optional, std::function;
