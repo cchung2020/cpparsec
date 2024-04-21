@@ -1,3 +1,6 @@
+#ifndef CPPARSEC_CHAR_H
+#define CPPARSEC_CHAR_H
+
 #include "cpparsec.h"
 
 namespace cpparsec {
@@ -48,3 +51,5 @@ namespace cpparsec {
     Parser<char> alpha_num();
 
 };
+
+#endif /* CPPARSEC_CHAR_H */

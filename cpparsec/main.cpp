@@ -2,6 +2,7 @@
 #include <chrono>
 #include <string>
 #include "cpparsec.h"
+#include "cpparsec_numeric.h"
 
 using namespace cpparsec;
 using namespace std;
