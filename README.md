@@ -29,3 +29,5 @@ It's a header file which simply includes cpparsec_core.h and cpparsec_char.h.
 * Add and perform benchmarking tests
 * Add a lot more tests
 * Add more examples
+
+This project is licensed under the terms of the MIT license.
