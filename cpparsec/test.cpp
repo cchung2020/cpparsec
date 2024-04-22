@@ -1,6 +1,7 @@
 #define BOOST_TEST_MODULE cpparsec
 
 #include <algorithm>
+#include <list>
 #include <boost/test/included/unit_test.hpp>
 #include <boost/cregex.hpp>
 #include "cpparsec.h"
@@ -15,6 +16,7 @@ BOOST_AUTO_TEST_SUITE(Character_Parsers)
 
 BOOST_AUTO_TEST_CASE(Char_Parser_Success)
 {
+
     string inputStr = "aabab";
     string_view input = inputStr;
 

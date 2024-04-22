@@ -1,4 +1,5 @@
 #include "cpparsec_char.h"
+#include <cctype>
 
 namespace cpparsec {
 
@@ -18,7 +19,7 @@ namespace cpparsec {
     // Parses any character
     Parser<char> any_char() {
         return Parser<char>([](InputStream& input) -> ParseResult<char> {
-            CPPARSEC_FAIL_IF(input.empty(), ParseError("any_char: unexpected end of input"));
+            CPPARSEC_FAIL_IF(input.empty(), ParseError("any_char: end of input"));
 
             char c = input[0];
             input.remove_prefix(1);
@@ -50,7 +51,7 @@ namespace cpparsec {
                     auto str2 = std::string(input.substr(0, i + 1));
                     input.remove_prefix(i);
 
-                    CPPARSEC_FAIL(ParseError(c, c2).add_error(ErrorContent{ std::pair{ str, str2 } }));
+                    CPPARSEC_FAIL(ParseError(c, c2).add_error({ std::pair{ str, str2 } }));
                 }
             }
 

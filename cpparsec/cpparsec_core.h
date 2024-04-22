@@ -6,12 +6,10 @@
 #include <expected>
 #include <string>
 #include <vector>
-#include <memory>
 #include <print>
 #include <ranges>
 #include <iostream>
 #include <string_view>
-#include <cctype>
 #include <concepts>
 #include <algorithm>
 #include <variant>
@@ -49,7 +47,7 @@
 #define CPPARSEC_DEFN_METHOD(name, ...) \
     cpparsec::_ParserFactory<__VA_ARGS__>() = [=, name = *this](cpparsec::InputStream& input) -> cpparsec::ParseResult<__VA_ARGS__>
 
-using std::println, std::format, std::string, std::string_view;
+using std::println;
 
 namespace cpparsec {
     // ========================================================================
@@ -57,32 +55,46 @@ namespace cpparsec {
     // ======================= HEADERS AND DECLARATIONS =======================
     // 
     // ========================================================================
-
-    struct ErrorContent
-        : std::variant<std::pair<std::string, std::string>, std::pair<char, char>, std::string, std::monostate>
-    { };
-
     class ParseError {
-    private:
-        std::vector<ErrorContent> errors;
-
     public:
-        ParseError(ErrorContent&& err);
-        ParseError(const std::string expected, const std::string found);
-        ParseError(char expected, char found);
-        ParseError(std::string&& msg);
+        struct ErrorContent
+            : std::variant<std::pair<std::string, std::string>, std::pair<char, char>, std::string, std::monostate>
+        { };
+
+        ParseError(ErrorContent&& err) : errors({ err }) { }
+        ParseError(const std::string expected, const std::string found) : errors({ ErrorContent{std::pair {expected, found}} }) { }
+        ParseError(char expected, char found) : errors({ ErrorContent{std::pair{expected, found}} }) { }
+        ParseError(std::string&& msg) : errors({ ErrorContent{msg} }) { }
 
         // Add error to error container
-        ParseError& add_error(ErrorContent&& err);
+        ParseError& add_error(ErrorContent&& err) {
+            errors.push_back(err);
+            return *this;
+        }
 
         // Returns deepest error message as a std::string
-        std::string message();
+        std::string message() {
+            return std::format("{}", errors.front());
+        }
 
         // Returns shallowest error message as a std::string
-        std::string message_top();
+        std::string message_top() {
+            return std::format("{}", errors.back());
+        }
 
         // Returns all error messages as a std::string
-        std::string message_stack();
+        std::string message_stack() {
+            std::string msg = std::format("{}", errors[0]);
+
+            for (size_t i = 1; i < errors.size(); i++) {
+                msg += std::format("\n{}", errors[i]);
+            }
+
+            return msg;
+        }
+
+    private:
+        std::vector<ErrorContent> errors;
     };
 
     template<typename T>
@@ -237,12 +249,6 @@ namespace cpparsec {
     template<typename T, PushBack<T> Container>
     Parser<Container> many1(Parser<T> p);
 
-    // Parse zero or more characters, std::string specialization
-    Parser<std::string> many(Parser<char> charP);
-
-    // Parse one or more characters, std::string specialization
-    Parser<std::string> many1(Parser<char> charP);
-
     // Parses p zero or more times until end succeeds, returning the parsed values
     template <typename T, typename U, PushBack<T> Container>
     Parser<Container> many_till(Parser<T> p, Parser<U> end);
@@ -250,14 +256,6 @@ namespace cpparsec {
     // Parses p one or more times until end succeeds, returning the parsed values
     template <typename T, typename U, PushBack<T> Container>
     Parser<Container> many1_till(Parser<T> p, Parser<U> end);
-
-    // Parses p zero or more times until end succeeds, returning the parsed values, std::string specialization
-    template <typename T, PushBack<char> StringContainer>
-    Parser<StringContainer> many_till(Parser<char> p, Parser<T> end);
-
-    // Parses p one or more times until end succeeds, returning the parsed values, std::string specialization
-    template <typename T, PushBack<char> StringContainer>
-    Parser<StringContainer> many1_till(Parser<char> p, Parser<T> end);
 
     // Parses zero or more instances of p, ignores results
     template <typename T>
@@ -275,14 +273,6 @@ namespace cpparsec {
     template <typename T, typename U>
     Parser<std::vector<T>> sep_by1(Parser<T> p, Parser<U> sep);
 
-    // Parse zero or more parses of p separated by sep, std::string specialization
-    template <typename T>
-    Parser<std::string> sep_by(Parser<char> p, Parser<T> sep);
-
-    // Parse one or more parses of p separated by sep, std::string specialization
-    template <typename T>
-    Parser<std::string> sep_by1(Parser<char> p, Parser<T> sep);
-
     // Parse zero or more parses of p separated by and ending with sep
     template <typename T, typename U>
     Parser<std::vector<T>> end_by(Parser<T> p, Parser<U> sep);
@@ -290,14 +280,6 @@ namespace cpparsec {
     // Parse one or more parses of p separated by and ending with sep
     template <typename T, typename U>
     Parser<std::vector<T>> end_by1(Parser<T> p, Parser<U> sep);
-
-    // Parse zero or more parses of p separated by and ending with sep, std::string specialization
-    template <typename T>
-    Parser<std::string> end_by(Parser<char> p, Parser<T> sep);
-
-    // Parse one or more parses of p separated by and ending with sep, std::string specialization
-    template <typename T>
-    Parser<std::string> end_by1(Parser<char> p, Parser<T> sep);
 
     // Parse one or more left associative applications of op to p, returning the
     // result of the repeated applications. Can be used to parse 1+2+3+4 as ((1+2)+3)+4
@@ -436,7 +418,7 @@ namespace cpparsec {
     Parser<T> Parser<T>::satisfy(std::function<bool(T)> cond) const {
         return CPPARSEC_DEFN_METHOD(thisParser, T) {
             ParseResult<T> result = thisParser(input);
-            CPPARSEC_FAIL_IF(!result || !cond(*result), format("Failed satisfy"));
+            CPPARSEC_FAIL_IF(!result || !cond(*result), std::format("Failed satisfy"));
 
             return result;
         };
@@ -579,7 +561,7 @@ namespace cpparsec {
     Parser<T> satisfy(const Parser<T>& parser, std::function<bool(T)> cond) {
         return CPPARSEC_DEFN_METHOD(thisParser, T) {
             ParseResult<T> result = thisParser(input);
-            CPPARSEC_FAIL_IF(!result || !cond(*result), format("Failed satisfy"));
+            CPPARSEC_FAIL_IF(!result || !cond(*result), std::format("Failed satisfy"));
 
             return result;
         };
@@ -637,7 +619,7 @@ namespace cpparsec {
         //return p.transform([](auto r) { return std::optional(r); }) | std::nullopt;
     }
 
-    namespace helper {
+    namespace detail {
         template <typename T, PushBack<T> Container = std::vector<T>>
             requires std::movable<Container>
         Parser<Container> many_accumulator(Parser<T> p, Container&& init = {}) {
@@ -667,7 +649,7 @@ namespace cpparsec {
     // Parse zero or more parses
     template<typename T, PushBack<T> Container = std::vector<T>>
     Parser<Container> many(Parser<T> p) {
-        return helper::many_accumulator(p);
+        return detail::many_accumulator<T, Container>(p);
     }
 
     // Parse one or more parses
@@ -675,13 +657,14 @@ namespace cpparsec {
     Parser<Container> many1(Parser<T> p) {
         return CPPARSEC_DEFN(std::vector<T>) {
             CPPARSEC_SAVE(first, p);
-            CPPARSEC_SAVE(values, helper::many_accumulator(p, { first }));
+            CPPARSEC_SAVE(values, detail::many_accumulator<T, Container>(p, { first }));
 
             return values;
         };
     }
 
-    namespace helper {
+
+    namespace detail {
         template <typename T, typename U, PushBack<T> Container = std::vector<T>>
             requires std::movable<Container>
         Parser<Container> many_till_accumulator(Parser<T> p, Parser<U> end, Container&& init = {}) {
@@ -713,7 +696,7 @@ namespace cpparsec {
     // Parses p zero or more times until end succeeds, returning the parsed values
     template <typename T, typename U, PushBack<T> Container = std::vector<T>>
     Parser<Container> many_till(Parser<T> p, Parser<U> end) {
-        return helper::many_till_accumulator(p, end);
+        return detail::many_till_accumulator<T, U, Container>(p, end);
     }
 
     // Parses p one or more times until end succeeds, returning the parsed values
@@ -721,24 +704,7 @@ namespace cpparsec {
     Parser<Container> many1_till(Parser<T> p, Parser<U> end) {
         return CPPARSEC_DEFN(Container) {
             CPPARSEC_SAVE(first, p);
-            CPPARSEC_SAVE(values, helper::many_till_accumulator(p, end, { first }));
-
-            return values;
-        };
-    }
-
-    // Parses p zero or more times until end succeeds, returning the parsed values, std::string specialization
-    template <typename T, PushBack<char> StringContainer = std::string>
-    Parser<StringContainer> many_till(Parser<char> p, Parser<T> end) {
-        return helper::many_till_accumulator(p, end, StringContainer());
-    }
-
-    // Parses p one or more times until end succeeds, returning the parsed values, std::string specialization
-    template <typename T, PushBack<char> StringContainer = std::string>
-    Parser<StringContainer> many1_till(Parser<char> p, Parser<T> end) {
-        return CPPARSEC_DEFN(StringContainer) {
-            CPPARSEC_SAVE(first, p);
-            CPPARSEC_SAVE(values, helper::many_till_accumulator(p, end, StringContainer({ first })));
+            CPPARSEC_SAVE(values, detail::many_till_accumulator<T, U, Container>(p, end, { first }));
 
             return values;
         };
@@ -776,23 +742,7 @@ namespace cpparsec {
     Parser<std::vector<T>> sep_by1(Parser<T> p, Parser<U> sep) {
         return CPPARSEC_DEFN(std::vector<T>) {
             CPPARSEC_SAVE(first, p);
-            CPPARSEC_SAVE(values, helper::many_accumulator(sep >> p, { first }));
-
-            return values;
-        };
-    }
-    // Parse zero or more parses of p separated by sep, std::string specialization
-    template <typename T>
-    Parser<std::string> sep_by(Parser<char> p, Parser<T> sep) {
-        return sep_by1(p, sep) | success("");
-    }
-
-    // Parse one or more parses of p separated by sep, std::string specialization
-    template <typename T>
-    Parser<std::string> sep_by1(Parser<char> p, Parser<T> sep) {
-        return CPPARSEC_DEFN(std::string) {
-            CPPARSEC_SAVE(first, p);
-            CPPARSEC_SAVE(values, helper::many_accumulator(sep >> p, std::string(1, first)));
+            CPPARSEC_SAVE(values, detail::many_accumulator(sep >> p, { first }));
 
             return values;
         };
@@ -807,18 +757,6 @@ namespace cpparsec {
     // Parse one or more parses of p separated by and ending with sep
     template <typename T, typename U>
     Parser<std::vector<T>> end_by1(Parser<T> p, Parser<U> sep) {
-        return many1(p << sep);
-    }
-
-    // Parse zero or more parses of p separated by and ending with sep, std::string specialization
-    template <typename T>
-    Parser<std::string> end_by(Parser<char> p, Parser<T> sep) {
-        return many(p << sep);
-    }
-
-    // Parse one or more parses of p separated by and ending with sep, std::string specialization
-    template <typename T>
-    Parser<std::string> end_by1(Parser<char> p, Parser<T> sep) {
         return many1(p << sep);
     }
 
@@ -969,12 +907,12 @@ namespace cpparsec {
 
 // needs to be outside namespace to be seen by fmt
 template <>
-struct std::formatter<cpparsec::ErrorContent> {
+struct std::formatter<cpparsec::ParseError::ErrorContent> {
     auto parse(std::format_parse_context& ctx) {
         return ctx.end();
     }
 
-    auto format(const cpparsec::ErrorContent& error, std::format_context& ctx) const {
+    auto format(const cpparsec::ParseError::ErrorContent& error, std::format_context& ctx) const {
         return std::visit([&ctx](auto&& err) {
             using T = std::decay_t<decltype(err)>;
             if constexpr (std::is_same_v<T, std::pair<char, char>>) {
