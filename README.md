@@ -14,7 +14,7 @@ Many of the design decisions are deliberately probing what is possible using the
 
 See [examples folder](https://github.com/cchung2020/cpparsec/tree/master/cpparsec/examples) and [tests](https://github.com/cchung2020/cpparsec/tree/master/cpparsec/tests) for usage.
 
-If you're parsing characters and can use std::basic_string, just add `include #cpparsec.h` at the top of your file. 
+If you're parsing characters and can use std::basic_string, add `include #cpparsec.h` at the top of your file. 
 
 It's a header file which simply includes cpparsec_core.h and cpparsec_char.h.
 
