@@ -26,6 +26,7 @@ It's a header file which simply includes cpparsec_core.h and cpparsec_char.h.
 * Make the library work on other compilers, only works on MSVC currently (!)
 * Investigate lowering compile times (!)
 * Investigate gap between debug and release build, currently up to 150x difference (!)
+* Add a wiki
 * Add and perform benchmarking tests
 * Add a lot more tests
 * Add more examples
