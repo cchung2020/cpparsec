@@ -4,8 +4,8 @@
 #include <list>
 #include <boost/test/included/unit_test.hpp>
 #include <boost/cregex.hpp>
-#include "cpparsec.h"
-#include "cpparsec_numeric.h"
+#include "../cpparsec.h"
+#include "../cpparsec_numeric.h"
 
 using namespace cpparsec;
 using std::string, std::string_view, std::vector, std::tuple, std::optional, std::function;

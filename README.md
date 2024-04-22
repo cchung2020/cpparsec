@@ -8,18 +8,16 @@ Many of the design decisions are deliberately probing what is possible using the
 
 # How do I install/compile it?
 
-[awaiting an upcoming cmake file, otherwise MSVC solution only]
-
-# How do I use it?
-
-See [examples folder](https://github.com/cchung2020/cpparsec/tree/master/cpparsec/examples) and [tests](https://github.com/cchung2020/cpparsec/tree/master/cpparsec/tests) for usage.
-
-If you're parsing characters and can use std::basic_string, add `include #cpparsec.h` at the top of your file. 
+Currently the project is header only. `include cpparsec.h` for the base character/std::string specialized parsers.
 
 It's a header file which simply includes cpparsec_core.h and cpparsec_char.h.
 
 1. cpparsec_core.h: headers for parser combinators 
 2. cpparsec_char.h: headers for char/std::string specializations
+
+# How do I use it?
+
+See [examples folder](https://github.com/cchung2020/cpparsec/tree/master/cpparsec/examples) and [tests](https://github.com/cchung2020/cpparsec/tree/master/cpparsec/tests) for usage.
 
 # To do:
 * Make error handling more efficient (!!)

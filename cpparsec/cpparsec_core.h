@@ -86,6 +86,7 @@ namespace cpparsec {
     // ======================= HEADERS AND DECLARATIONS =======================
     // 
     // ========================================================================
+
     class ParseError {
     public:
         struct ErrorContent
