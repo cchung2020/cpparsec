@@ -50,6 +50,37 @@
 using std::println;
 
 namespace cpparsec {
+
+    //template<typename T>
+    //concept InputStream = requires(T stream, size_t n) {
+    //    { stream.empty() } -> std::convertible_to<bool>;
+    //    { stream.peek() } -> std::same_as<char>;  // Example for a char stream
+    //    { stream.consume() };
+    //    { stream.consume(n) };
+    //};
+
+    //template<typename T, InputStream Stream>
+    //class Parser {
+    //public:
+    //    using ParseResult = std::expected<T, std::string>; // Using std::expected for parse results
+    //    using ParseFunction = std::function<ParseResult(Stream&)>;
+    //    // Example usage
+    //    struct StringStream {
+    //        std::string data;
+    //        size_t index = 0;
+
+    //        bool empty() const { return index >= data.size(); }
+    //        char peek() const { return data[index]; }
+    //        void consume() { if (!empty()) index++; }
+    //    };
+
+    //    template<typename StringStream>
+    //    concept InputStream = requires(StringStream s) {
+    //        { s.empty() } -> std::convertible_to<bool>;
+    //        { s.peek() } -> std::same_as<char>;
+    //        { s.consume() };
+    //    };
+
     // ========================================================================
     // 
     // ======================= HEADERS AND DECLARATIONS =======================
@@ -897,7 +928,7 @@ namespace cpparsec {
         return CPPARSEC_DEFN(T) {
             ParseResult<T> result = p.parse(input);
             if (!result.has_value()) {
-                result.error() = ParseError(msg);
+                CPPARSEC_FAIL(ParseError({ msg }));
             }
             return result;
         };
