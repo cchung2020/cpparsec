@@ -1,7 +1,7 @@
 #ifndef CPPARSEC_CHAR_H
 #define CPPARSEC_CHAR_H
 
-#include "cpparsec.h"
+#include "cpparsec_core.h"
 
 namespace cpparsec {
 
