@@ -1,110 +1,169 @@
-#ifndef CPPARSEC_CHAR_H
-#define CPPARSEC_CHAR_H
+#ifndef CPPARSEC_CHAR_ALT_EXAMPLE_H
+#define CPPARSEC_CHAR_ALT_EXAMPLE_H
 
 #include "cpparsec_core.h"
 
-namespace cpparsec {
+namespace cpparsec_example {
+    using namespace cpparsec;
+
+    // ===================== ALT CHARACTER PARSER EXAMPLE =====================
+
+    // the default cpparsec_char.h is prioritized in the construction
+    // of this library, but you can make your own parser without too 
+    // much extra hassle 
+
+    // this one behaves the same as cpparsec_char but with a custom InputStream
+    // class which behaves similarly to string view, but counts characters 
+    // consumed, utilizing the same cpparsec_core.h combinators
+
+    // eventually this character counting behavior will be the default behavior
+
+    class CustomStringViewInput {
+    private:
+        std::string_view view;
+        size_t chars_consumed;
+        
+    public:
+        CustomStringViewInput(const std::string& str) : view(str), chars_consumed(0) {}
+
+        size_t get_chars_consumed() {
+            return chars_consumed;
+        }
+
+        auto data() {
+            return view.data();
+        }
+
+        const char& operator[](size_t n) {
+            return view[n];
+        }
+
+        void remove_prefix(size_t n) {
+            chars_consumed += n;
+            view.remove_prefix(n);
+        }
+    };
+
+    template <typename T>
+    struct CharParser : public Parser<T, std::string_view> {
+        using Parser<T, std::string_view>::Parser; 
+
+        CharParser(const Parser<T, std::string_view>& other) : Parser<T, std::string_view>(other) {}
+        CharParser(Parser<T, std::string_view>&& other) : Parser<T, std::string_view>(std::move(other)) {}
+    };
 
     // ======================== CORE CHARACTER PARSERS ========================
 
     // Parses a single character
-    inline Parser<char> char_(char c);
+    inline CharParser<char> char_(char c);
 
     // Parses any character
-    inline Parser<char> any_char();
+    inline CharParser<char> any_char();
 
     // Parses a single character that satisfies a constraint
     // Faster than try_(any_char().satisfy(cond))
-    inline Parser<char> char_satisfy(UnaryPredicate<char> auto cond, std::string&& err_msg = "<char_satisfy>");
+    inline CharParser<char> char_satisfy(UnaryPredicate<char> auto cond, std::string&& err_msg = "<char_satisfy>");
 
     // Parses a single string
-    inline Parser<std::string> string_(const std::string& str);
+    inline CharParser<std::string> string_(const std::string& str);
+
+    void func() {
+        CharParser<char> x = char_('c');
+        CharParser<char> z = x.between(char_('b'), char_('d'));
+    }
 
     // ========================== CHARACTER PARSERS ===========================
 
     // Parses a single letter
-    inline Parser<char> letter() {
-        return char_satisfy(isalpha, "<letter>");
+    inline CharParser<char> letter() {
+        return char_satisfy([](auto c) { return isalpha(c);  }, "<letter>");
     }
 
     // Parses a single digit
-    inline Parser<char> digit() {
+    inline CharParser<char> digit() {
         return char_satisfy(isdigit, "<digit>");
     }
 
     // Parses a single digit
-    inline Parser<char> digit2() {
+    inline CharParser<char> digit2() {
         return char_satisfy(isdigit);
     }
 
     // Parses a single space
-    inline Parser<char> space() {
+    inline CharParser<char> space() {
         return char_satisfy(isspace, "<space>");
     }
 
     // Skips zero or more spaces
-    inline Parser<std::monostate> spaces() {
+    inline CharParser<std::monostate> spaces() {
         return skip_many(space());
     }
 
     // Skips one or more spaces
-    inline Parser<std::monostate> spaces1() {
+    inline CharParser<std::monostate> spaces1() {
         return skip_many1(space());
     }
 
     // Parses a single newline '\n'
-    inline Parser<char> newline() {
+    inline CharParser<char> newline() {
         return char_('\n');
     }
 
     // Parses a single uppercase letter 
-    inline Parser<char> upper() {
+    inline CharParser<char> upper() {
         return char_satisfy(isupper, "<uppercase>");
     }
 
     // Parses a single lowercase letter 
-    inline Parser<char> lower() {
+    inline CharParser<char> lower() {
         return char_satisfy(islower, "<lowercase>");
     }
 
     // Parses a single alphanumeric letter 
-    inline Parser<char> alpha_num() {
+    inline CharParser<char> alpha_num() {
         return char_satisfy(isalnum, "<alphanum>");
+    }
+
+    // =========================== Numeric Parsers ============================
+
+    // Parses an int
+    inline CharParser<int> int_() {
+        return many1(digit()).transform<int>([](auto&& s) { return std::stoi(s); });
     }
 
     // ======================== STRING SPECIALIZATIONS ========================
 
     // Parse zero or more characters, std::string specialization
     template <PushBack<char> StringContainer>
-    Parser<StringContainer> many(Parser<char> charP);
+    CharParser<StringContainer> many(CharParser<char> charP);
 
     // Parse one or more characters, std::string specialization
     template <PushBack<char> StringContainer>
-    Parser<StringContainer> many1(Parser<char> charP);
+    CharParser<StringContainer> many1(CharParser<char> charP);
 
     // Parses p zero or more times until end succeeds, returning the parsed values, std::string specialization
     template <typename T, PushBack<char> StringContainer>
-    Parser<StringContainer> many_till(Parser<char> p, Parser<T> end);
+    CharParser<StringContainer> many_till(CharParser<char> p, CharParser<T> end);
 
     // Parses p one or more times until end succeeds, returning the parsed values, std::string specialization
     template <typename T, PushBack<char> StringContainer>
-    Parser<StringContainer> many1_till(Parser<char> p, Parser<T> end);
+    CharParser<StringContainer> many1_till(CharParser<char> p, CharParser<T> end);
 
     // Parse zero or more parses of p separated by sep, std::string specialization
     template <typename T>
-    Parser<std::string> sep_by(Parser<char> p, Parser<T> sep);
+    CharParser<std::string> sep_by(CharParser<char> p, CharParser<T> sep);
 
     // Parse one or more parses of p separated by sep, std::string specialization
     template <typename T>
-    Parser<std::string> sep_by1(Parser<char> p, Parser<T> sep);
+    CharParser<std::string> sep_by1(CharParser<char> p, CharParser<T> sep);
 
     // Parse zero or more parses of p separated by and ending with sep, std::string specialization
     template <typename T>
-    Parser<std::string> end_by(Parser<char> p, Parser<T> sep);
+    CharParser<std::string> end_by(CharParser<char> p, CharParser<T> sep);
 
     // Parse one or more parses of p separated by and ending with sep, std::string specialization
     template <typename T>
-    Parser<std::string> end_by1(Parser<char> p, Parser<T> sep);
+    CharParser<std::string> end_by1(CharParser<char> p, CharParser<T> sep);
 
     // ========================================================================
     // 
@@ -115,8 +174,8 @@ namespace cpparsec {
     // ======================== Core Character Parsers ========================
 
         // Parses a single character
-    inline Parser<char> char_(char c) {
-        return CPPARSEC_DEFN(char) {
+    inline CharParser<char> char_(char c) {
+        return CPPARSEC_DEFN_CUSTOM(CharParser, char) {
             CPPARSEC_FAIL_IF(input.empty(), ParseError("end of input", { c }));
             CPPARSEC_FAIL_IF(input[0] != c, ParseError(input[0], c));
 
@@ -126,8 +185,8 @@ namespace cpparsec {
     }
 
     // Parses any character
-    inline Parser<char> any_char() {
-        return CPPARSEC_DEFN(char) {
+    inline CharParser<char> any_char() {
+        return CPPARSEC_DEFN_CUSTOM(CharParser, char) {
             CPPARSEC_FAIL_IF(input.empty(), ParseError("any_char: end of input"));
 
             char c = input[0];
@@ -138,8 +197,8 @@ namespace cpparsec {
 
     // Parses a single character that satisfies a constraint
     // Faster than try_(any_char().satisfy(cond))
-    inline Parser<char> char_satisfy(UnaryPredicate<char> auto cond, std::string&& err_msg) {
-        return CPPARSEC_DEFN(char) {
+    inline CharParser<char> char_satisfy( auto cond, std::string&& err_msg) {
+        return cpparsec::_ParserFactory<char, CharParser<char>>() = [=](CharParser<char>::InputStream& input)->cpparsec::ParseResult<char> {
             CPPARSEC_FAIL_IF(input.empty(), ParseError(err_msg, "end of input"));
             CPPARSEC_FAIL_IF(!cond(input[0]), ParseError(err_msg, { input[0] }));
 
@@ -150,8 +209,8 @@ namespace cpparsec {
     }
 
     // Parses a single string
-    inline Parser<std::string> string_(const std::string& str) {
-        return CPPARSEC_DEFN(std::string) {
+    inline CharParser<std::string> string_(const std::string& str) {
+        return CPPARSEC_DEFN_CUSTOM(CharParser, std::string) {
             CPPARSEC_FAIL_IF(str.size() > input.size(), ParseError("end of input", { str[0] }));
 
             for (auto [i, c] : str | std::views::enumerate) {
@@ -173,14 +232,14 @@ namespace cpparsec {
 
     // Parse zero or more characters, std::string specialization
     template <PushBack<char> StringContainer = std::string>
-    Parser<StringContainer> many(Parser<char> charP) {
+    CharParser<StringContainer> many(CharParser<char> charP) {
         return detail::many_accumulator(charP, StringContainer());
     }
 
     // Parse one or more characters, std::string specialization
     template <PushBack<char> StringContainer = std::string>
-    Parser<StringContainer> many1(Parser<char> charP) {
-        return CPPARSEC_DEFN(StringContainer) {
+    CharParser<StringContainer> many1(CharParser<char> charP) {
+        return CPPARSEC_DEFN_CUSTOM(CharParser, StringContainer) {
             CPPARSEC_SAVE(first, charP);
             CPPARSEC_SAVE(values, detail::many_accumulator(charP, StringContainer({ first })));
 
@@ -190,14 +249,14 @@ namespace cpparsec {
 
     // Parses p zero or more times until end succeeds, returning the parsed values, std::string specialization
     template <typename T, PushBack<char> StringContainer = std::string>
-    Parser<StringContainer> many_till(Parser<char> p, Parser<T> end) {
+    CharParser<StringContainer> many_till(CharParser<char> p, CharParser<T> end) {
         return detail::many_till_accumulator(p, end, StringContainer());
     }
 
     // Parses p one or more times until end succeeds, returning the parsed values, std::string specialization
     template <typename T, PushBack<char> StringContainer = std::string>
-    Parser<StringContainer> many1_till(Parser<char> p, Parser<T> end) {
-        return CPPARSEC_DEFN(StringContainer) {
+    CharParser<StringContainer> many1_till(CharParser<char> p, CharParser<T> end) {
+        return CPPARSEC_DEFN_CUSTOM(CharParser, StringContainer) {
             CPPARSEC_SAVE(first, p);
             CPPARSEC_SAVE(values, detail::many_till_accumulator(p, end, StringContainer({ first })));
 
@@ -207,14 +266,14 @@ namespace cpparsec {
 
     // Parse zero or more parses of p separated by sep, std::string specialization
     template <typename T>
-    Parser<std::string> sep_by(Parser<char> p, Parser<T> sep) {
+    CharParser<std::string> sep_by(CharParser<char> p, CharParser<T> sep) {
         return sep_by1(p, sep) | success("");
     }
 
     // Parse one or more parses of p separated by sep, std::string specialization
     template <typename T>
-    Parser<std::string> sep_by1(Parser<char> p, Parser<T> sep) {
-        return CPPARSEC_DEFN(std::string) {
+    CharParser<std::string> sep_by1(CharParser<char> p, CharParser<T> sep) {
+        return CPPARSEC_DEFN_CUSTOM(CharParser, std::string) {
             CPPARSEC_SAVE(first, p);
             CPPARSEC_SAVE(values, detail::many_accumulator(sep >> p, std::string(1, first)));
 
@@ -224,15 +283,15 @@ namespace cpparsec {
 
     // Parse zero or more parses of p separated by and ending with sep, std::string specialization
     template <typename T>
-    Parser<std::string> end_by(Parser<char> p, Parser<T> sep) {
+    CharParser<std::string> end_by(CharParser<char> p, CharParser<T> sep) {
         return many(p << sep);
     }
 
     // Parse one or more parses of p separated by and ending with sep, std::string specialization
     template <typename T>
-    Parser<std::string> end_by1(Parser<char> p, Parser<T> sep) {
+    CharParser<std::string> end_by1(CharParser<char> p, CharParser<T> sep) {
         return many1(p << sep);
     }
 };
 
-#endif /* CPPARSEC_CHAR_H */
+#endif /* CPPARSEC_CHAR_ALT_EXAMPLE_H */

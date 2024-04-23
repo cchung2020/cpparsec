@@ -30,6 +30,9 @@
     <ClCompile Include="tests\test.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="tests\test_alt_char.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cpparsec.h">
@@ -42,6 +45,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="cpparsec_core.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cpparsec_char_alt_example.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

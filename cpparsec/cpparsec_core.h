@@ -38,14 +38,16 @@
 #define CPPARSEC_FAIL(message) return std::unexpected([=]() { return message; });
 
 #define CPPARSEC_GET_INPUT input
-#define CPPARSEC_GET_INPUT_DATA input.data()
 #define CPPARSEC_SET_INPUT(new_input) input = new_input;
 
 #define CPPARSEC_DEFN(...) \
-    cpparsec::_ParserFactory<__VA_ARGS__>() = [=](cpparsec::InputStream& input) -> cpparsec::ParseResult<__VA_ARGS__>
+    cpparsec::_ParserFactory<__VA_ARGS__>() = [=](Parser<__VA_ARGS__>::InputStream& input) -> cpparsec::ParseResult<__VA_ARGS__>
+
+#define CPPARSEC_DEFN_CUSTOM(CustomParser, ...) \
+    cpparsec::_ParserFactory<__VA_ARGS__, CustomParser<__VA_ARGS__>>() = [=](CustomParser<__VA_ARGS__>::InputStream& input) -> cpparsec::ParseResult<__VA_ARGS__>
 
 #define CPPARSEC_DEFN_METHOD(name, ...) \
-    cpparsec::_ParserFactory<__VA_ARGS__>() = [=, name = *this](cpparsec::InputStream& input) -> cpparsec::ParseResult<__VA_ARGS__>
+    cpparsec::_ParserFactory<__VA_ARGS__>() = [=, name = *this](Parser<__VA_ARGS__>::InputStream& input) -> cpparsec::ParseResult<__VA_ARGS__>
 
 using std::println;
 
@@ -81,61 +83,67 @@ namespace cpparsec {
     //        { s.consume() };
     //    };
 
+
+    // =============================== CONCEPTS ===============================
+
+    
+    
+    // Concept for a container that can call push_back
+    template <typename C, typename T>
+    concept PushBack = requires (C c, T t) {
+        { c.push_back(t) } -> std::same_as<void>;
+        { c.push_back(std::move(t)) } -> std::same_as<void>;
+    };
+
+    // Concept for a unary predicate function
+    template<typename Pred, typename Arg>
+    concept UnaryPredicate = requires(Pred f, Arg a) {
+        { f(a) } -> std::convertible_to<bool>;
+    };
+
     // ========================================================================
     // 
     // ======================= HEADERS AND DECLARATIONS =======================
     // 
     // ========================================================================
 
+    // ============================= PARSE ERROR ==============================
+
+    template <std::formattable<char> Atom = char>
     class ParseError {
     public:
         struct ErrorContent
-            : std::variant<std::pair<std::string, std::string>, std::pair<char, char>, std::string, std::monostate>
+            : std::variant<std::pair<std::string, std::string>, std::pair<Atom, Atom>, std::string, std::monostate>
         { };
 
         ParseError(ErrorContent&& err) : errors({ err }) { }
         ParseError(const std::string expected, const std::string found) : errors({ ErrorContent{std::pair {expected, found}} }) { }
-        ParseError(char expected, char found) : errors({ ErrorContent{std::pair{expected, found}} }) { }
+        ParseError(std::formattable<char> auto expected, std::formattable<char> auto found) : errors({ ErrorContent{std::pair {expected, found}} }) { }
         ParseError(std::string&& msg) : errors({ ErrorContent{msg} }) { }
 
         // Add error to error container
-        ParseError& add_error(ErrorContent&& err) {
-            errors.push_back(err);
-            return *this;
-        }
+        ParseError& add_error(ErrorContent&& err);
 
         // Returns deepest error message as a std::string
-        std::string message() {
-            return std::format("{}", errors.front());
-        }
+        std::string message();
 
         // Returns shallowest error message as a std::string
-        std::string message_top() {
-            return std::format("{}", errors.back());
-        }
+        std::string message_top();
 
         // Returns all error messages as a std::string
-        std::string message_stack() {
-            std::string msg = std::format("{}", errors[0]);
-
-            for (size_t i = 1; i < errors.size(); i++) {
-                msg += std::format("\n{}", errors[i]);
-            }
-
-            return msg;
-        }
+        std::string message_stack();
 
     private:
         std::vector<ErrorContent> errors;
     };
 
-    template<typename T>
-    using ParseResult = std::expected<T, std::function<ParseError()>>;
-    using InputStream = std::string_view;
+    template<typename T, std::formattable<char> Atom = char>
+    using ParseResult = std::expected<T, std::function<ParseError<Atom>()>>;
 
-    template<typename T>
+    template<typename T, typename InputClass = std::string_view>
     class Parser {
     public:
+        using InputStream = InputClass;
         using ParseFunction = std::function<ParseResult<T>(InputStream&)>; // ParseResult<T>(*)(InputStream&)
 
     private:
@@ -149,63 +157,48 @@ namespace cpparsec {
         // Top level parser execution, parses a string
         ParseResult<T> parse(const std::string& input) const;
 
-        // Top level parser execution, parses a string_view
-        // Parser consumes/modifies string_view
-        ParseResult<T> parse(std::string_view& input) const;
+        // Top level parser execution, parses an InputStream
+        // Parser consumes/modifies InputStream
+        ParseResult<T> parse(InputStream& input) const;
 
         // Parses self and other, returns result of other
         template<typename U>
-        Parser<U> with(Parser<U> other) const;
+        Parser<U, InputClass> with(Parser<U, InputClass> other) const;
 
         // Parses self and other, returns result of self
         template<typename U>
-        Parser<T> skip(Parser<U> other) const;
+        Parser<T, InputClass> skip(Parser<U, InputClass> other) const;
 
         // Parses self and other, returns pair of both results
         template<typename U>
-        Parser<std::pair<T, U>> pair_with(Parser<U> other) const;
+        Parser<std::pair<T, U>> pair_with(Parser<U, InputClass> other) const;
 
         // Parses occurence satisfying a condition
-        Parser<T> satisfy(std::function<bool(T)> cond) const;
+        Parser<T, InputClass> satisfy(std::function<bool(T)> cond) const;
 
         // Parse occurence between two parses
         template<typename O, typename C>
-        Parser<T> between(Parser<O> open, Parser<C> close) const;
+        Parser<T, InputClass> between(Parser<O, InputClass> open, Parser<C, InputClass> close) const;
 
         // | "or" operator parses the left parser, then the right parser if the left one fails without consuming
-        Parser<T> or_(const Parser<T>& right) const;
+        Parser<T, InputClass> or_(const Parser<T, InputClass>& right) const;
 
         // Parses p without consuming input on failure
-        Parser<T> try_() const;
+        Parser<T, InputClass> try_() const;
 
         // Apply a function to the parse result
         template <typename U>
-        Parser<U> transform(std::function<U(T)> func) const;
+        Parser<U, InputClass> transform(std::function<U(T)> func) const;
     };
 
     // ============================ PARSER FACTORY ============================
 
     // Implementation detail, should never be invoked manually
-    template <typename T>
+    template <typename T, typename ParserType = Parser<T>>
     struct _ParserFactory {
-        Parser<T> operator=(Parser<T>::ParseFunction&& parser) {
+        ParserType operator=(ParserType::ParseFunction&& parser) {
             return Parser<T>(std::move(parser));
         }
-    };
-
-    // =============================== CONCEPTS ===============================
-
-    // Concept for a container that can call push_back
-    template <typename C, typename T>
-    concept PushBack = requires (C c, T t) {
-        { c.push_back(t) } -> std::same_as<void>;
-        { c.push_back(std::move(t)) } -> std::same_as<void>;
-    };
-
-    // Concept for a unary predicate function
-    template<typename Pred, typename Arg>
-    concept UnaryPredicate = requires(Pred f, Arg a) {
-        { f(a) } -> std::convertible_to<bool>;
     };
 
     // ======================= CORE PARSER COMBINATORS ========================
@@ -375,34 +368,65 @@ namespace cpparsec {
     template <typename T>
     Parser<T> operator%(Parser<T> p, std::string&& msg);
 
-
     // ========================================================================
     // 
     // ======================= TEMPLATE IMPLEMENTATIONS =======================
     // 
     // ========================================================================
 
+    // ============================= PARSE ERROR ==============================
+
+    // Add error to error container
+    template <std::formattable<char> Atom>
+    ParseError<Atom>& ParseError<Atom>::add_error(ErrorContent&& err) {
+        errors.push_back(err);
+        return *this;
+    }
+
+    // Returns deepest error message as a std::string
+    template <std::formattable<char> Atom>
+    std::string ParseError<Atom>::message() {
+        return std::format("{}", errors.front());
+    }
+
+    // Returns shallowest error message as a std::string
+    template <std::formattable<char> Atom>
+    std::string ParseError<Atom>::message_top() {
+        return std::format("{}", errors.back());
+    }
+
+    // Returns all error messages as a std::string
+    template <std::formattable<char> Atom>
+    std::string ParseError<Atom>::message_stack() {
+        std::string msg = std::format("{}", errors[0]);
+
+        for (size_t i = 1; i < errors.size(); i++) {
+            msg += std::format("\n{}", errors[i]);
+        }
+
+        return msg;
+    }
 
     // ================================ Parser ================================
 
     // Implementation detail, Parsers take ParseFunctions
     // Use the CPPARSEC_DEFN macro for documented parsers
-    template <typename T>
-    Parser<T>::Parser(ParseFunction&& parser) :
+    template <typename T, typename InputClass>
+    Parser<T, InputClass>::Parser(ParseFunction&& parser) :
         parser(std::move(parser))
     { }
 
     // Top level parser execution, parses a string
-    template <typename T>
-    ParseResult<T> Parser<T>::parse(const std::string& input) const {
+    template <typename T, typename InputClass>
+    ParseResult<T> Parser<T, InputClass>::parse(const std::string& input) const {
         InputStream view = input;
         return parser(view);
     }
 
     // Top level parser execution, parses a string_view
     // Parser consumes/modifies string_view
-    template <typename T>
-    ParseResult<T> Parser<T>::parse(std::string_view& input) const {
+    template <typename T, typename InputClass>
+    ParseResult<T> Parser<T, InputClass>::parse(Parser<T, InputClass>::InputStream& input) const {
         InputStream view = input;
         auto result = parser(view);
         input = view;
@@ -410,9 +434,9 @@ namespace cpparsec {
     }
 
     // Parses self and other, returns result of other
-    template<typename T>
+    template<typename T, typename InputClass>
     template<typename U>
-    Parser<U> Parser<T>::with(Parser<U> other) const {
+    Parser<U, InputClass> Parser<T, InputClass>::with(Parser<U, InputClass> other) const {
         return CPPARSEC_DEFN_METHOD(thisParser, U) {
             CPPARSEC_SKIP(thisParser);
             CPPARSEC_SAVE(result, other);
@@ -422,9 +446,9 @@ namespace cpparsec {
     }
 
     // Parses self and other, returns result of self
-    template<typename T>
+    template<typename T, typename InputClass>
     template<typename U>
-    Parser<T> Parser<T>::skip(Parser<U> other) const {
+    Parser<T, InputClass> Parser<T, InputClass>::skip(Parser<U, InputClass> other) const {
         return CPPARSEC_DEFN_METHOD(thisParser, T) {
             CPPARSEC_SAVE(result, thisParser);
             CPPARSEC_SKIP(other);
@@ -434,9 +458,9 @@ namespace cpparsec {
     }
 
     // Parses self and other, returns pair of both results
-    template<typename T>
+    template<typename T, typename InputClass>
     template<typename U>
-    Parser<std::pair<T, U>> Parser<T>::pair_with(Parser<U> other) const {
+    Parser<std::pair<T, U>> Parser<T, InputClass>::pair_with(Parser<U, InputClass> other) const {
         return CPPARSEC_DEFN_METHOD(thisParser, std::pair<T, U>) {
             CPPARSEC_SAVE(a, thisParser);
             CPPARSEC_SAVE(b, other);
@@ -446,8 +470,8 @@ namespace cpparsec {
     }
 
     // Parses occurence satisfying a condition
-    template<typename T>
-    Parser<T> Parser<T>::satisfy(std::function<bool(T)> cond) const {
+    template<typename T, typename InputClass>
+    Parser<T, InputClass> Parser<T, InputClass>::satisfy(std::function<bool(T)> cond) const {
         return CPPARSEC_DEFN_METHOD(thisParser, T) {
             ParseResult<T> result = thisParser(input);
             CPPARSEC_FAIL_IF(!result || !cond(*result), std::format("Failed satisfy"));
@@ -457,15 +481,15 @@ namespace cpparsec {
     }
 
     // Parse occurence between two parses
-    template<typename T>
+    template<typename T, typename InputClass>
     template<typename O, typename C>
-    Parser<T> Parser<T>::between(Parser<O> open, Parser<C> close) const {
+    Parser<T, InputClass> Parser<T, InputClass>::between(Parser<O, InputClass> open, Parser<C, InputClass> close) const {
         return open.with(*this).skip(close);
     }
 
     // | "or" operator parses the left parser, then the right parser if the left one fails without consuming
-    template <typename T>
-    Parser<T> Parser<T>::or_(const Parser<T>& right) const {
+    template <typename T, typename InputClass>
+    Parser<T, InputClass> Parser<T, InputClass>::or_(const Parser<T, InputClass>& right) const {
         return CPPARSEC_DEFN_METHOD(thisParser, T) {
             auto starting_input = input;
             if (ParseResult<T> result = thisParser.parse(input)) {
@@ -480,8 +504,8 @@ namespace cpparsec {
     }
 
     // Parses p without consuming input on failure
-    template<typename T>
-    Parser<T> Parser<T>::try_() const {
+    template<typename T, typename InputClass>
+    Parser<T, InputClass> Parser<T, InputClass>::try_() const {
         return CPPARSEC_DEFN_METHOD(thisParser, T) {
             auto starting_input = input;
             ParseResult<T> result = thisParser.parse(input);
@@ -494,9 +518,9 @@ namespace cpparsec {
     }
 
     // Apply a function to the parse result
-    template<typename T>
+    template<typename T, typename InputClass>
     template <typename U>
-    Parser<U> Parser<T>::transform(std::function<U(T)> func) const {
+    Parser<U, InputClass> Parser<T, InputClass>::transform(std::function<U(T)> func) const {
         return CPPARSEC_DEFN_METHOD(thisParser, U) {
             ParseResult<T> result = thisParser.parse(input);
             return result.transform(func);
@@ -619,7 +643,7 @@ namespace cpparsec {
     template <typename T = std::monostate>
     Parser<std::monostate> eof() {
         return CPPARSEC_DEFN(T) {
-            CPPARSEC_FAIL_IF(input.size() > 0, ParseError({ input[0] }, "end of input"));
+            CPPARSEC_FAIL_IF(input.size() > 0, ParseError(std::format("{}", input.front()), "end of input"));
             return T{};
         };
     }
@@ -641,9 +665,9 @@ namespace cpparsec {
     template<typename T>
     Parser<std::optional<T>> optional_result(Parser<T> p) {
         return CPPARSEC_DEFN(std::optional<T>) {
-            auto start_point = CPPARSEC_GET_INPUT_DATA;
+            auto start_point = input.data();
             ParseResult<T> result = p.parse(input);
-            CPPARSEC_FAIL_IF(!result && start_point != CPPARSEC_GET_INPUT_DATA, ParseError("optional_result", "optional_result"));
+            CPPARSEC_FAIL_IF(!result && start_point != input.data(), result.error()());
 
             return (result ? std::optional(result.value()) : std::nullopt);
         };
@@ -659,7 +683,7 @@ namespace cpparsec {
                 Container values(init);
 
                 while (true) {
-                    auto starting_point = CPPARSEC_GET_INPUT_DATA;
+                    auto starting_point = input.data();
                     if (ParseResult<T> result = p.parse(input)) {
                         values.push_back(*result);
                         continue;
@@ -704,12 +728,12 @@ namespace cpparsec {
                 Container values(init);
 
                 while (true) {
-                    auto start_point = CPPARSEC_GET_INPUT_DATA;
+                    auto start_point = input.data();
 
                     if (end.parse(input)) {
                         break; // end parser succeeded, stop accumulating
                     }
-                    CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA, ParseError("many_tillfail", "many_tillfail"));
+                    CPPARSEC_FAIL_IF(start_point != input.data(), ParseError("many_tillfail", "many_tillfail"));
 
                     if (ParseResult<T> result = p.parse(input)) {
                         values.push_back(*result);
@@ -747,9 +771,9 @@ namespace cpparsec {
     Parser<std::monostate> skip_many(Parser<T> p) {
         return CPPARSEC_DEFN(std::monostate) {
             while (true) {
-                auto starting_point = CPPARSEC_GET_INPUT_DATA;
+                auto starting_point = input.data();
                 if (!p.parse(input)) {
-                    CPPARSEC_FAIL_IF(starting_point != CPPARSEC_GET_INPUT_DATA, ParseError("skip_many", "skip_many"));
+                    CPPARSEC_FAIL_IF(starting_point != input.data(), ParseError("skip_many", "skip_many"));
                     break;
                 }
             }
@@ -800,10 +824,10 @@ namespace cpparsec {
             CPPARSEC_SAVE(arg1, arg);
 
             while (true) {
-                auto start_point = CPPARSEC_GET_INPUT_DATA;
+                auto start_point = input.data();
                 ParseResult<std::function<T(T, T)>> f = op.parse(input);
                 if (!f) {
-                    CPPARSEC_FAIL_IF(start_point != CPPARSEC_GET_INPUT_DATA, f.error()());
+                    CPPARSEC_FAIL_IF(start_point != input.data(), f.error()());
                     break;
                 }
                 CPPARSEC_SAVE(arg2, arg);
@@ -939,24 +963,25 @@ namespace cpparsec {
 
 // needs to be outside namespace to be seen by fmt
 template <>
-struct std::formatter<cpparsec::ParseError::ErrorContent> {
+struct std::formatter<typename cpparsec::ParseError<>::ErrorContent> {
     auto parse(std::format_parse_context& ctx) {
         return ctx.end();
     }
 
-    auto format(const cpparsec::ParseError::ErrorContent& error, std::format_context& ctx) const {
+    template <std::formattable<char> T = char>
+    auto format(const typename cpparsec::ParseError<T>::ErrorContent& error, std::format_context& ctx) const {
         return std::visit([&ctx](auto&& err) {
-            using T = std::decay_t<decltype(err)>;
-            if constexpr (std::is_same_v<T, std::pair<char, char>>) {
+            using V = std::decay_t<decltype(err)>;
+            if constexpr (std::is_same_v<V, std::pair<T, T>>) {
                 return std::format_to(ctx.out(), "Expected '{}', found '{}'", err.first, err.second);
             }
-            else if constexpr (std::is_same_v<T, std::pair<std::string, std::string>>) {
+            else if constexpr (std::is_same_v<V, std::pair<std::string, std::string>>) {
                 return std::format_to(ctx.out(), "Expected \"{}\", found \"{}\"", err.first, err.second);
             }
-            else if constexpr (std::is_same_v<T, std::string>) {
+            else if constexpr (std::is_same_v<V, std::string>) {
                 return std::format_to(ctx.out(), "{}", err);
             }
-            else if constexpr (std::is_same_v<T, std::monostate>) {
+            else if constexpr (std::is_same_v<V, std::monostate>) {
                 return std::format_to(ctx.out(), "empty error");
             }
             }, error);

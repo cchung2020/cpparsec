@@ -1,16 +1,16 @@
-#define BOOST_TEST_MODULE cpparsec
+#define BOOST_TEST_MODULE cpparsec_alt_char
 
 #include <algorithm>
 #include <list>
 #include <boost/test/included/unit_test.hpp>
 #include <boost/cregex.hpp>
 #include "../cpparsec_core.h"
-#include "../cpparsec_char.h"
-#include "../cpparsec_numeric.h"
+#include "../cpparsec_char_alt_example.h"
 
-using namespace cpparsec;
 using std::string, std::string_view, std::vector, std::tuple, std::optional, std::function;
 using std::ranges::all_of;
+
+using namespace cpparsec_example;
 
 // --------------------------- Character Parsers ---------------------------
 BOOST_AUTO_TEST_SUITE(Character_Parsers)
@@ -21,7 +21,7 @@ BOOST_AUTO_TEST_CASE(Char_Parser_Success)
     string inputStr = "aabab";
     string_view input = inputStr;
 
-    Parser<char> a = char_('a');
+    CharParser<char> a = char_('a');
     ParseResult<char> result = a.parse(input);
 
     BOOST_REQUIRE(result.has_value());
@@ -45,7 +45,7 @@ BOOST_AUTO_TEST_CASE(Char_And_Operator)
     string inputStr = "abab";
     string_view input = inputStr;
 
-    Parser<tuple<char, char>> a_and_b = char_('a') & char_('b');
+    CharParser<tuple<char, char>> a_and_b = char_('a') & char_('b');
     ParseResult<tuple<char, char>> result = a_and_b.parse(input);
 
     BOOST_REQUIRE(result.has_value());
@@ -58,8 +58,8 @@ BOOST_AUTO_TEST_CASE(Char_With_Method)
     string inputStr = "ab";
     string_view input = inputStr;
 
-    Parser<char> a = char_('a');
-    Parser<char> a_with_b = a.with(char_('b'));
+    CharParser<char> a = char_('a');
+    CharParser<char> a_with_b = a.with(char_('b'));
     auto result = a_with_b.parse(input);
 
     BOOST_REQUIRE(result.has_value());
@@ -186,7 +186,7 @@ BOOST_AUTO_TEST_CASE(Between_Parser_Failure)
 
 BOOST_AUTO_TEST_CASE(Between_Parser_Complex_Type)
 {
-    Parser<string> excl_between_xz = many1(char_('!')).between(char_('x'), char_('z'));
+    CharParser<string> excl_between_xz = many1(char_('!')).between(char_('x'), char_('z'));
     ParseResult<string> result = excl_between_xz.parse("x!!!!!!!z");
 
     BOOST_REQUIRE(result.has_value());
@@ -259,7 +259,7 @@ BOOST_AUTO_TEST_CASE(SepBy_Parser_Success)
     string inputStr = "1 2 3 4 5";
     string_view input = inputStr;
 
-    Parser<vector<int>> spaced_ints = sep_by(int_(), space());
+    CharParser<vector<int>> spaced_ints = sep_by(int_(), space());
     ParseResult<vector<int>> result = spaced_ints.parse(input);
 
     BOOST_REQUIRE(result.has_value());
@@ -271,7 +271,7 @@ BOOST_AUTO_TEST_CASE(SepBy1_Parser_Complex_Input)
     string inputStr = "a 1b2c 3y 123z";
     string_view input = inputStr;
 
-    Parser<string> char_sepby_spaced_int = sep_by1(any_char(), optional_(space()) >> int_());
+    CharParser<string> char_sepby_spaced_int = sep_by1(any_char(), optional_(space()) >> int_());
     ParseResult<string> result = char_sepby_spaced_int.parse(input);
 
     BOOST_REQUIRE(result.has_value());
@@ -289,7 +289,7 @@ BOOST_AUTO_TEST_CASE(ManyTill_Parser_Success)
     string inputStr = "1 2 3 4 5!...";
     string_view input = inputStr;
 
-    Parser<vector<int>> nums_till_excl = many_till(int_() << optional_(space()), char_('!'));
+    CharParser<vector<int>> nums_till_excl = many_till(int_() << optional_(space()), char_('!'));
     ParseResult<vector<int>> result = nums_till_excl.parse(input);
 
     BOOST_REQUIRE(result.has_value());
@@ -302,7 +302,7 @@ BOOST_AUTO_TEST_CASE(ManyTill_Parser_Empty_Success)
     string inputStr = "!nothing";
     string_view input = inputStr;
 
-    Parser<vector<int>> nums_till_excl = many_till(int_() << optional_(space()), char_('!'));
+    CharParser<vector<int>> nums_till_excl = many_till(int_() << optional_(space()), char_('!'));
     ParseResult<vector<int>> result = nums_till_excl.parse(input);
 
     BOOST_REQUIRE(result.has_value());
@@ -315,7 +315,7 @@ BOOST_AUTO_TEST_CASE(ManyTill_Parser_Complex_Type)
     string inputStr = "/*inside comment*/!";
     string_view input = inputStr;
 
-    Parser<string> simple_comment =
+    CharParser<string> simple_comment =
         string_("/*") >> many1_till(any_char(), try_(string_("*/")));
     ParseResult<string> result = simple_comment.parse(input);
 
@@ -395,7 +395,7 @@ BOOST_AUTO_TEST_SUITE(Optional_Result_Parsers)
 
 BOOST_AUTO_TEST_CASE(Optional_Result_Parser_Int)
 {
-    Parser<optional<int>> opt_int = optional_result(int_());
+    CharParser<optional<int>> opt_int = optional_result(int_());
     ParseResult<optional<int>> result = opt_int.parse("123");
 
     BOOST_REQUIRE(result.has_value());
@@ -404,7 +404,7 @@ BOOST_AUTO_TEST_CASE(Optional_Result_Parser_Int)
 
 BOOST_AUTO_TEST_CASE(Optional_Result_Parser_No_Int)
 {
-    Parser<optional<int>> opt_int = optional_result(int_());
+    CharParser<optional<int>> opt_int = optional_result(int_());
     ParseResult<optional<int>> result = opt_int.parse("X");
 
     BOOST_REQUIRE(result.has_value());
@@ -424,7 +424,7 @@ BOOST_AUTO_TEST_CASE(ChainL_Parser)
 
     auto spaced = [](auto p) { return p.between(spaces(), spaces()); };
 
-    function<Parser<int>()> expr, term, factor;
+    function<CharParser<int>()> expr, term, factor;
 
     factor = [&]() { return spaced(int_() | lazy(expr).between(char_('('), char_(')'))); };
     term = [&]() { return chainl1(factor(), char_('*') >> mul_op); };
@@ -480,9 +480,9 @@ BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser)
         return try_(
             look_ahead(string_(word)) >> char_(word[0]) >> success(num)
         );
-        };
+    };
 
-    Parser<int> wordToNum =
+    CharParser<int> wordToNum =
         partialParseNum("one", 1)
         | partialParseNum("two", 2)
         | partialParseNum("three", 3)
@@ -495,9 +495,9 @@ BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser)
 
     function charToInt = [](char c) { return c - '0'; };
 
-    Parser<int> number = digit().transform(charToInt) | wordToNum;
+    CharParser<int> number = digit().transform(charToInt) | wordToNum;
 
-    Parser<int> numberBetweenLetters = number.between(
+    CharParser<int> numberBetweenLetters = number.between(
         (many(not_followed_by(number) >> letter())),
         (many(not_followed_by(number) >> letter())));
 
@@ -521,11 +521,11 @@ BOOST_AUTO_TEST_CASE(Choice_Parser_Multiple_Choices)
     string inputStr = "two threeten two tenEND";
     string_view input = inputStr;
 
-    Parser<int> t_skeleton_nums = choice<int>(vector({
+    CharParser<int> t_skeleton_nums = choice<int>(vector({
         try_(string_("two") >> spaces() >> success(2)),
         try_(string_("three") >> spaces() >> success(3)),
         try_(string_("ten") >> spaces() >> success(10)),
-    }));
+        }));
 
     ParseResult<vector<int>> result = many1(t_skeleton_nums).parse(input);
 
