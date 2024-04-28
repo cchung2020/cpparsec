@@ -7,7 +7,7 @@
 #include "../cpparsec_core.h"
 #include "../cpparsec_char_alt_example.h"
 
-using std::string, std::string_view, std::vector, std::tuple, std::optional, std::function;
+using std::string, std::vector, std::tuple, std::optional, std::function;
 using std::ranges::all_of;
 
 using namespace cpparsec_example;
@@ -19,7 +19,7 @@ BOOST_AUTO_TEST_CASE(Char_Parser_Success)
 {
 
     string inputStr = "aabab";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     CharParser<char> a = char_('a');
     ParseResult<char> result = a.parse(input);
@@ -32,7 +32,7 @@ BOOST_AUTO_TEST_CASE(Char_Parser_Success)
 BOOST_AUTO_TEST_CASE(Char_Parser_Failure)
 {
     string inputStr = "aabab";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     ParseResult<char> result = char_('A').parse(input);
 
@@ -43,7 +43,7 @@ BOOST_AUTO_TEST_CASE(Char_Parser_Failure)
 BOOST_AUTO_TEST_CASE(Char_And_Operator)
 {
     string inputStr = "abab";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     CharParser<tuple<char, char>> a_and_b = char_('a') & char_('b');
     ParseResult<tuple<char, char>> result = a_and_b.parse(input);
@@ -56,7 +56,7 @@ BOOST_AUTO_TEST_CASE(Char_And_Operator)
 BOOST_AUTO_TEST_CASE(Char_With_Method)
 {
     string inputStr = "ab";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     CharParser<char> a = char_('a');
     CharParser<char> a_with_b = a.with(char_('b'));
@@ -84,7 +84,7 @@ BOOST_AUTO_TEST_SUITE(String_Parsers)
 BOOST_AUTO_TEST_CASE(String_Parser_Success)
 {
     string inputStr = "test string";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     ParseResult<string> result = string_("test").parse(input);
 
@@ -96,7 +96,7 @@ BOOST_AUTO_TEST_CASE(String_Parser_Success)
 BOOST_AUTO_TEST_CASE(String_Parser_With_Space)
 {
     string inputStr = " string";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     ParseResult<string> result = (space() >> string_("string")).parse(input);
     BOOST_REQUIRE(result.has_value());
@@ -124,7 +124,7 @@ BOOST_AUTO_TEST_SUITE(Count_Parsers)
 BOOST_AUTO_TEST_CASE(Count_Parser_Success)
 {
     string inputStr = "1 2 3 4 5 6 7";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     ParseResult<vector<int>> result = count(5, int_() << optional_(space())).parse(input);
 
@@ -136,7 +136,7 @@ BOOST_AUTO_TEST_CASE(Count_Parser_Success)
 BOOST_AUTO_TEST_CASE(Count_Parser_Failure)
 {
     string inputStr = "1 2 3";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     ParseResult<vector<int>> result = count(5, int_() << optional_(space())).parse(input);
 
@@ -147,7 +147,7 @@ BOOST_AUTO_TEST_CASE(Count_Parser_Failure)
 BOOST_AUTO_TEST_CASE(Count_Parser_Complex_Type)
 {
     string inputStr = "xyxyxyxy!";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     auto is_xy = [](auto xy) { return xy == tuple('x', 'y'); };
     ParseResult<vector<tuple<char, char>>> result = count(4, char_('x') & char_('y')).parse(input);
@@ -167,13 +167,13 @@ BOOST_AUTO_TEST_SUITE(Between_Parsers)
 BOOST_AUTO_TEST_CASE(Between_Parser_Success)
 {
     string inputStr = "xyz";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     ParseResult<char> result = char_('y').between(char_('x'), char_('z')).parse(input);
 
     BOOST_REQUIRE(result.has_value());
     BOOST_CHECK(*result == 'y');
-    BOOST_CHECK(eof().parse(input).has_value());
+    BOOST_CHECK(eof<CustomStrView>().parse(input).has_value());
 }
 
 BOOST_AUTO_TEST_CASE(Between_Parser_Failure)
@@ -202,7 +202,7 @@ BOOST_AUTO_TEST_SUITE(Many_Parsers)
 BOOST_AUTO_TEST_CASE(Many_Parser_Digits)
 {
     string inputStr = "53242k";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     ParseResult<string> result = many(digit()).parse(input);
 
@@ -214,7 +214,7 @@ BOOST_AUTO_TEST_CASE(Many_Parser_Digits)
 BOOST_AUTO_TEST_CASE(Many_Parser_Complex_Type)
 {
     string inputStr = "xyxyxyEND";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     auto xy = char_('x') & char_('y');
     auto is_xy = [](auto xy) { return xy == tuple('x', 'y'); };
@@ -229,7 +229,7 @@ BOOST_AUTO_TEST_CASE(Many_Parser_Complex_Type)
 BOOST_AUTO_TEST_CASE(Many1_Parser_UpperCase)
 {
     string inputStr = "HELLOworld";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     ParseResult<string> result = many1(upper()).parse(input);
 
@@ -241,7 +241,7 @@ BOOST_AUTO_TEST_CASE(Many1_Parser_UpperCase)
 BOOST_AUTO_TEST_CASE(Many1_Parser_Failure)
 {
     string inputStr = "helloWORLD";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     ParseResult<string> result = many1(upper()).parse(input);
 
@@ -257,7 +257,7 @@ BOOST_AUTO_TEST_SUITE(SepBy_Parsers)
 BOOST_AUTO_TEST_CASE(SepBy_Parser_Success)
 {
     string inputStr = "1 2 3 4 5";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     CharParser<vector<int>> spaced_ints = sep_by(int_(), space());
     ParseResult<vector<int>> result = spaced_ints.parse(input);
@@ -269,7 +269,7 @@ BOOST_AUTO_TEST_CASE(SepBy_Parser_Success)
 BOOST_AUTO_TEST_CASE(SepBy1_Parser_Complex_Input)
 {
     string inputStr = "a 1b2c 3y 123z";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     CharParser<string> char_sepby_spaced_int = sep_by1(any_char(), optional_(space()) >> int_());
     ParseResult<string> result = char_sepby_spaced_int.parse(input);
@@ -287,7 +287,7 @@ BOOST_AUTO_TEST_SUITE(ManyTill_Parsers)
 BOOST_AUTO_TEST_CASE(ManyTill_Parser_Success)
 {
     string inputStr = "1 2 3 4 5!...";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     CharParser<vector<int>> nums_till_excl = many_till(int_() << optional_(space()), char_('!'));
     ParseResult<vector<int>> result = nums_till_excl.parse(input);
@@ -300,7 +300,7 @@ BOOST_AUTO_TEST_CASE(ManyTill_Parser_Success)
 BOOST_AUTO_TEST_CASE(ManyTill_Parser_Empty_Success)
 {
     string inputStr = "!nothing";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     CharParser<vector<int>> nums_till_excl = many_till(int_() << optional_(space()), char_('!'));
     ParseResult<vector<int>> result = nums_till_excl.parse(input);
@@ -313,7 +313,7 @@ BOOST_AUTO_TEST_CASE(ManyTill_Parser_Empty_Success)
 BOOST_AUTO_TEST_CASE(ManyTill_Parser_Complex_Type)
 {
     string inputStr = "/*inside comment*/!";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     CharParser<string> simple_comment =
         string_("/*") >> many1_till(any_char(), try_(string_("*/")));
@@ -333,7 +333,7 @@ BOOST_AUTO_TEST_SUITE(TryOr_Parsers)
 BOOST_AUTO_TEST_CASE(TryOr_Parser_Success)
 {
     string inputStr = "ab";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     auto a_or_b = char_('a') | char_('b');
     ParseResult<char> result = a_or_b.parse(input);
@@ -346,7 +346,7 @@ BOOST_AUTO_TEST_CASE(TryOr_Parser_Success)
 BOOST_AUTO_TEST_CASE(TryOr_Parser_With_Try_Success)
 {
     string inputStr = "three";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     auto two = string_("two");
     auto three = string_("three");
@@ -419,8 +419,8 @@ BOOST_AUTO_TEST_SUITE(ChainL_Parsers)
 
 BOOST_AUTO_TEST_CASE(ChainL_Parser)
 {
-    auto add_op = success(function<int(int, int)>([](int a, int b) { return a + b; }));
-    auto mul_op = success(function<int(int, int)>([](int a, int b) { return a * b; }));
+    auto add_op = success<CustomStrView>(function<int(int, int)>([](int a, int b) { return a + b; }));
+    auto mul_op = success<CustomStrView>(function<int(int, int)>([](int a, int b) { return a * b; }));
 
     auto spaced = [](auto p) { return p.between(spaces(), spaces()); };
 
@@ -459,7 +459,7 @@ BOOST_AUTO_TEST_CASE(ChainL_Parser)
     BOOST_REQUIRE(!result6);
 
     string inputStr = " ( 2 ) + ( 3 * ( ( 4 ) ) ) + 5 end";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     ParseResult<int> result7 = expr().parse(input);
 
@@ -478,7 +478,7 @@ BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser)
 {
     auto partialParseNum = [](const string& word, int num) {
         return try_(
-            look_ahead(string_(word)) >> char_(word[0]) >> success(num)
+            look_ahead(string_(word)) >> char_(word[0]).success(num)
         );
     };
 
@@ -502,7 +502,7 @@ BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser)
         (many(not_followed_by(number) >> letter())));
 
     string inputStr = "x5KZ4threeXtwone0Y";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
     ParseResult<vector<int>> result1 = many1(numberBetweenLetters).parse(input);
 
@@ -519,13 +519,13 @@ BOOST_AUTO_TEST_SUITE(Choice_Parsers)
 BOOST_AUTO_TEST_CASE(Choice_Parser_Multiple_Choices)
 {
     string inputStr = "two threeten two tenEND";
-    string_view input = inputStr;
+    CustomStrView input = inputStr;
 
-    CharParser<int> t_skeleton_nums = choice<int>(vector({
-        try_(string_("two") >> spaces() >> success(2)),
-        try_(string_("three") >> spaces() >> success(3)),
-        try_(string_("ten") >> spaces() >> success(10)),
-        }));
+    CharParser<int> t_skeleton_nums = choice(vector({
+        try_(string_("two") >> spaces().success(2)),
+        try_(string_("three") >> spaces().success(3)),
+        try_(string_("ten") >> spaces().success(10)),
+    }));
 
     ParseResult<vector<int>> result = many1(t_skeleton_nums).parse(input);
 

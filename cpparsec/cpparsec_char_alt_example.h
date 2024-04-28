@@ -18,39 +18,59 @@ namespace cpparsec_example {
 
     // eventually this character counting behavior will be the default behavior
 
-    class CustomStringViewInput {
+    class CustomStrView {
     private:
         std::string_view view;
         size_t chars_consumed;
-        
+
     public:
-        CustomStringViewInput(const std::string& str) : view(str), chars_consumed(0) {}
+        CustomStrView(const std::string& str) : view(str), chars_consumed(0) {}
 
-        size_t get_chars_consumed() {
-            return chars_consumed;
-        }
+        using const_iterator = std::string_view::const_iterator;
 
-        auto data() {
-            return view.data();
-        }
-
-        const char& operator[](size_t n) {
-            return view[n];
-        }
+        // functions for accessing the underlying view
+        size_t size() { return view.size(); }
+        auto data() { return view.data(); }
+        bool empty() { return view.empty(); }
+        const_iterator begin() { return view.begin(); }
+        const_iterator end() { return view.end(); }
+        const char& front() const { return view.front(); }
+        const char& back() const { return view.back(); }
+        auto& operator[](size_t n) { return view[n]; }
+        const auto& operator[](size_t n) const { return view[n]; }
+        std::string_view substr(size_t offset, size_t count) { return view.substr(offset, count); }
 
         void remove_prefix(size_t n) {
             chars_consumed += n;
             view.remove_prefix(n);
         }
+
+        size_t get_chars_consumed() {
+            return chars_consumed;
+        }
+
+        const std::string_view get_view() {
+            return view;
+        }
     };
+
+    bool operator==(CustomStrView s1, const std::string& s2) {
+        return s1.get_view() == s2;
+    }
+    bool operator==(const std::string& s1, CustomStrView s2) {
+        return s1 == s2.get_view();
+    }
+
+    //template <typename T>
+    //struct CharParser : public Parser<T, std::string_view> {
+    //    using Parser<T, std::string_view>::Parser; 
+
+    //    CharParser(const Parser<T, std::string_view>& other) : Parser<T, std::string_view>(other) {}
+    //    CharParser(Parser<T, std::string_view>&& other) : Parser<T, std::string_view>(std::move(other)) {}
+    //};
 
     template <typename T>
-    struct CharParser : public Parser<T, std::string_view> {
-        using Parser<T, std::string_view>::Parser; 
-
-        CharParser(const Parser<T, std::string_view>& other) : Parser<T, std::string_view>(other) {}
-        CharParser(Parser<T, std::string_view>&& other) : Parser<T, std::string_view>(std::move(other)) {}
-    };
+    using CharParser = Parser<T, CustomStrView>;
 
     // ======================== CORE CHARACTER PARSERS ========================
 
@@ -66,13 +86,6 @@ namespace cpparsec_example {
 
     // Parses a single string
     inline CharParser<std::string> string_(const std::string& str);
-
-    void func() {
-        CharParser<char> x = char_('c');
-        CharParser<char> z = x.between(char_('b'), char_('d'));
-    }
-
-    // ========================== CHARACTER PARSERS ===========================
 
     // Parses a single letter
     inline CharParser<char> letter() {
@@ -101,7 +114,7 @@ namespace cpparsec_example {
 
     // Skips one or more spaces
     inline CharParser<std::monostate> spaces1() {
-        return skip_many1(space());
+        return skip(space().between(space(), space()));
     }
 
     // Parses a single newline '\n'
@@ -122,13 +135,6 @@ namespace cpparsec_example {
     // Parses a single alphanumeric letter 
     inline CharParser<char> alpha_num() {
         return char_satisfy(isalnum, "<alphanum>");
-    }
-
-    // =========================== Numeric Parsers ============================
-
-    // Parses an int
-    inline CharParser<int> int_() {
-        return many1(digit()).transform<int>([](auto&& s) { return std::stoi(s); });
     }
 
     // ======================== STRING SPECIALIZATIONS ========================
@@ -175,7 +181,7 @@ namespace cpparsec_example {
 
         // Parses a single character
     inline CharParser<char> char_(char c) {
-        return CPPARSEC_DEFN_CUSTOM(CharParser, char) {
+        return CPPARSEC_MAKE(CharParser<char>) {
             CPPARSEC_FAIL_IF(input.empty(), ParseError("end of input", { c }));
             CPPARSEC_FAIL_IF(input[0] != c, ParseError(input[0], c));
 
@@ -186,7 +192,7 @@ namespace cpparsec_example {
 
     // Parses any character
     inline CharParser<char> any_char() {
-        return CPPARSEC_DEFN_CUSTOM(CharParser, char) {
+        return CPPARSEC_MAKE(CharParser<char>) {
             CPPARSEC_FAIL_IF(input.empty(), ParseError("any_char: end of input"));
 
             char c = input[0];
@@ -197,8 +203,8 @@ namespace cpparsec_example {
 
     // Parses a single character that satisfies a constraint
     // Faster than try_(any_char().satisfy(cond))
-    inline CharParser<char> char_satisfy( auto cond, std::string&& err_msg) {
-        return cpparsec::_ParserFactory<char, CharParser<char>>() = [=](CharParser<char>::InputStream& input)->cpparsec::ParseResult<char> {
+    inline CharParser<char> char_satisfy(UnaryPredicate<char> auto cond, std::string&& err_msg) {
+        return CPPARSEC_MAKE(CharParser<char>) {
             CPPARSEC_FAIL_IF(input.empty(), ParseError(err_msg, "end of input"));
             CPPARSEC_FAIL_IF(!cond(input[0]), ParseError(err_msg, { input[0] }));
 
@@ -210,7 +216,7 @@ namespace cpparsec_example {
 
     // Parses a single string
     inline CharParser<std::string> string_(const std::string& str) {
-        return CPPARSEC_DEFN_CUSTOM(CharParser, std::string) {
+        return CPPARSEC_MAKE(CharParser<std::string>) {
             CPPARSEC_FAIL_IF(str.size() > input.size(), ParseError("end of input", { str[0] }));
 
             for (auto [i, c] : str | std::views::enumerate) {
@@ -239,7 +245,7 @@ namespace cpparsec_example {
     // Parse one or more characters, std::string specialization
     template <PushBack<char> StringContainer = std::string>
     CharParser<StringContainer> many1(CharParser<char> charP) {
-        return CPPARSEC_DEFN_CUSTOM(CharParser, StringContainer) {
+        return CPPARSEC_MAKE(CharParser<StringContainer>) {
             CPPARSEC_SAVE(first, charP);
             CPPARSEC_SAVE(values, detail::many_accumulator(charP, StringContainer({ first })));
 
@@ -250,15 +256,15 @@ namespace cpparsec_example {
     // Parses p zero or more times until end succeeds, returning the parsed values, std::string specialization
     template <typename T, PushBack<char> StringContainer = std::string>
     CharParser<StringContainer> many_till(CharParser<char> p, CharParser<T> end) {
-        return detail::many_till_accumulator(p, end, StringContainer());
+        return detail::many_till_accumulator<char, T, StringContainer, CustomStrView>(p, end, StringContainer());
     }
 
     // Parses p one or more times until end succeeds, returning the parsed values, std::string specialization
     template <typename T, PushBack<char> StringContainer = std::string>
     CharParser<StringContainer> many1_till(CharParser<char> p, CharParser<T> end) {
-        return CPPARSEC_DEFN_CUSTOM(CharParser, StringContainer) {
+        return CPPARSEC_MAKE(CharParser<StringContainer>) {
             CPPARSEC_SAVE(first, p);
-            CPPARSEC_SAVE(values, detail::many_till_accumulator(p, end, StringContainer({ first })));
+            CPPARSEC_SAVE(values, detail::many_till_accumulator<char, T, StringContainer, CustomStrView>(p, end, StringContainer({ first })));
 
             return values;
         };
@@ -267,13 +273,13 @@ namespace cpparsec_example {
     // Parse zero or more parses of p separated by sep, std::string specialization
     template <typename T>
     CharParser<std::string> sep_by(CharParser<char> p, CharParser<T> sep) {
-        return sep_by1(p, sep) | success("");
+        return sep_by1(p, sep) | success<CustomStrView>("");
     }
 
     // Parse one or more parses of p separated by sep, std::string specialization
     template <typename T>
     CharParser<std::string> sep_by1(CharParser<char> p, CharParser<T> sep) {
-        return CPPARSEC_DEFN_CUSTOM(CharParser, std::string) {
+        return CPPARSEC_MAKE(CharParser<std::string>) {
             CPPARSEC_SAVE(first, p);
             CPPARSEC_SAVE(values, detail::many_accumulator(sep >> p, std::string(1, first)));
 
@@ -291,6 +297,13 @@ namespace cpparsec_example {
     template <typename T>
     CharParser<std::string> end_by1(CharParser<char> p, CharParser<T> sep) {
         return many1(p << sep);
+    }
+
+    // =========================== Numeric Parsers ============================
+
+    // Parses an int
+    inline CharParser<int> int_() {
+        return many1(digit()).transform<int>([](auto&& s) { return std::stoi(s); });
     }
 };
 

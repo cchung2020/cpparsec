@@ -1,19 +1,18 @@
 #ifndef CPPARSEC_CORE_H
 #define CPPARSEC_CORE_H
 
-#include <functional>
-#include <optional>
-#include <expected>
-#include <string>
-#include <vector>
 #include <print>
-#include <ranges>
 #include <iostream>
-#include <string_view>
-#include <concepts>
-#include <algorithm>
+#include <vector>
+#include <expected>
 #include <variant>
+#include <string>
+#include <string_view>
+#include <algorithm>
+#include <functional>
 #include <utility>
+#include <ranges>
+#include <concepts>
 
 // Initialize a variable with a parse result value
 // Automatically returns if the parser fails
@@ -37,69 +36,15 @@
 // Automatically returns ParseError
 #define CPPARSEC_FAIL(message) return std::unexpected([=]() { return message; });
 
-#define CPPARSEC_GET_INPUT input
-#define CPPARSEC_SET_INPUT(new_input) input = new_input;
+#define CPPARSEC_MAKE(...) \
+    cpparsec::_ParserFactory<__VA_ARGS__> () = [=](__VA_ARGS__::InputStream& input) -> cpparsec::ParseResult<typename __VA_ARGS__::Item>
 
-#define CPPARSEC_DEFN(...) \
-    cpparsec::_ParserFactory<__VA_ARGS__>() = [=](Parser<__VA_ARGS__>::InputStream& input) -> cpparsec::ParseResult<__VA_ARGS__>
-
-#define CPPARSEC_DEFN_CUSTOM(CustomParser, ...) \
-    cpparsec::_ParserFactory<__VA_ARGS__, CustomParser<__VA_ARGS__>>() = [=](CustomParser<__VA_ARGS__>::InputStream& input) -> cpparsec::ParseResult<__VA_ARGS__>
-
-#define CPPARSEC_DEFN_METHOD(name, ...) \
-    cpparsec::_ParserFactory<__VA_ARGS__>() = [=, name = *this](Parser<__VA_ARGS__>::InputStream& input) -> cpparsec::ParseResult<__VA_ARGS__>
+#define CPPARSEC_MAKE_METHOD(name, ...) \
+    cpparsec::_ParserFactory<__VA_ARGS__> () = [=, name = *this](__VA_ARGS__::InputStream& input) -> cpparsec::ParseResult<typename __VA_ARGS__::Item>
 
 using std::println;
 
 namespace cpparsec {
-
-    //template<typename T>
-    //concept InputStream = requires(T stream, size_t n) {
-    //    { stream.empty() } -> std::convertible_to<bool>;
-    //    { stream.peek() } -> std::same_as<char>;  // Example for a char stream
-    //    { stream.consume() };
-    //    { stream.consume(n) };
-    //};
-
-    //template<typename T, InputStream Stream>
-    //class Parser {
-    //public:
-    //    using ParseResult = std::expected<T, std::string>; // Using std::expected for parse results
-    //    using ParseFunction = std::function<ParseResult(Stream&)>;
-    //    // Example usage
-    //    struct StringStream {
-    //        std::string data;
-    //        size_t index = 0;
-
-    //        bool empty() const { return index >= data.size(); }
-    //        char peek() const { return data[index]; }
-    //        void consume() { if (!empty()) index++; }
-    //    };
-
-    //    template<typename StringStream>
-    //    concept InputStream = requires(StringStream s) {
-    //        { s.empty() } -> std::convertible_to<bool>;
-    //        { s.peek() } -> std::same_as<char>;
-    //        { s.consume() };
-    //    };
-
-
-    // =============================== CONCEPTS ===============================
-
-    
-    
-    // Concept for a container that can call push_back
-    template <typename C, typename T>
-    concept PushBack = requires (C c, T t) {
-        { c.push_back(t) } -> std::same_as<void>;
-        { c.push_back(std::move(t)) } -> std::same_as<void>;
-    };
-
-    // Concept for a unary predicate function
-    template<typename Pred, typename Arg>
-    concept UnaryPredicate = requires(Pred f, Arg a) {
-        { f(a) } -> std::convertible_to<bool>;
-    };
 
     // ========================================================================
     // 
@@ -140,10 +85,34 @@ namespace cpparsec {
     template<typename T, std::formattable<char> Atom = char>
     using ParseResult = std::expected<T, std::function<ParseError<Atom>()>>;
 
-    template<typename T, typename InputClass = std::string_view>
+    // ============================ PARSER CONCEPTS ===========================
+
+    // Parser: you can call .parse(s) on it, and it returns a ParserResult
+    template<typename Parser, typename T, typename Input>
+    concept ParserType = requires(Parser p, Input& s) {
+        { p.parse(s) }; // ->std::same_as<ParseResult<T>>;
+    };
+
+    // Concept for a container that can call push_back
+    template <typename C, typename T>
+    concept PushBack = requires (C c, T t) {
+        { c.push_back(t) } -> std::same_as<void>;
+        { c.push_back(std::move(t)) } -> std::same_as<void>;
+    };
+
+    // Concept for a unary predicate function
+    template<typename Pred, typename Arg>
+    concept UnaryPredicate = requires(Pred f, Arg a) {
+        { f(a) } -> std::convertible_to<bool>;
+    };
+
+    // ================================ PARSER ================================
+
+    template<typename T, typename Input = std::string_view>
     class Parser {
     public:
-        using InputStream = InputClass;
+        using Item = T;
+        using InputStream = Input;
         using ParseFunction = std::function<ParseResult<T>(InputStream&)>; // ParseResult<T>(*)(InputStream&)
 
     private:
@@ -151,7 +120,7 @@ namespace cpparsec {
 
     public:
         // Implementation detail, Parsers take ParseFunctions
-        // Use the CPPARSEC_DEFN macro for documented parsers
+        // Use the CPPARSEC_MAKE macro for documented parsers
         Parser(ParseFunction&& parser);
 
         // Top level parser execution, parses a string
@@ -163,210 +132,214 @@ namespace cpparsec {
 
         // Parses self and other, returns result of other
         template<typename U>
-        Parser<U, InputClass> with(Parser<U, InputClass> other) const;
+        Parser<U, Input> with(Parser<U, Input> other) const;
 
         // Parses self and other, returns result of self
         template<typename U>
-        Parser<T, InputClass> skip(Parser<U, InputClass> other) const;
+        Parser<T, Input> skip(Parser<U, Input> other) const;
 
         // Parses self and other, returns pair of both results
         template<typename U>
-        Parser<std::pair<T, U>> pair_with(Parser<U, InputClass> other) const;
+        Parser<std::pair<T, U>, Input> pair_with(Parser<U, Input> other) const;
 
         // Parses occurence satisfying a condition
-        Parser<T, InputClass> satisfy(std::function<bool(T)> cond) const;
+        Parser<T, Input> satisfy(std::function<bool(T)> cond) const;
+
+        // Never consumes input and always succeeds, returns the value given. 
+        template <typename U>
+        Parser<U, Input> success(U item);
 
         // Parse occurence between two parses
         template<typename O, typename C>
-        Parser<T, InputClass> between(Parser<O, InputClass> open, Parser<C, InputClass> close) const;
+        Parser<T, Input> between(Parser<O, Input> open, Parser<C, Input> close) const;
 
         // | "or" operator parses the left parser, then the right parser if the left one fails without consuming
-        Parser<T, InputClass> or_(const Parser<T, InputClass>& right) const;
+        Parser<T, Input> or_(const Parser<T, Input>& right) const;
 
         // Parses p without consuming input on failure
-        Parser<T, InputClass> try_() const;
+        Parser<T, Input> try_() const;
 
         // Apply a function to the parse result
         template <typename U>
-        Parser<U, InputClass> transform(std::function<U(T)> func) const;
+        Parser<U, Input> transform(std::function<U(T)> func) const;
     };
 
     // ============================ PARSER FACTORY ============================
 
     // Implementation detail, should never be invoked manually
-    template <typename T, typename ParserType = Parser<T>>
+    template <typename ParserType>
     struct _ParserFactory {
         ParserType operator=(ParserType::ParseFunction&& parser) {
-            return Parser<T>(std::move(parser));
+            return ParserType(std::move(parser));
         }
     };
 
     // ======================= CORE PARSER COMBINATORS ========================
 
     // Parses given number of parses
-    template<typename T>
-    Parser<std::vector<T>> count(int n, Parser<T> p);
+    template<typename T, typename Input>
+    Parser<std::vector<T>, Input> count(int n, Parser<T, Input> p);
 
     // Parses a sequence of functions, returning on the first successful result.
-    template<typename T, std::ranges::input_range Container>
-    Parser<T> choice(Container parsers);
+    template<typename T, typename Input>
+    Parser<T, Input> choice(std::vector<Parser<T, Input>> parsers);
 
     // Parse occurence between two parses
     // between(open, close, p) is open.with(p).skip(close) is open >> p << close
-    template<typename O, typename C, typename T>
-    Parser<T> between(Parser<O> open, Parser<C> close, Parser<T> p);
+    template<typename O, typename C, typename T, typename Input>
+    Parser<T, Input> between(Parser<O> open, Parser<C> close, Parser<T, Input> p);
 
     // between 2
-    template<typename O, typename C, typename T>
-    Parser<T> between2(Parser<O> open, Parser<C> close, Parser<T> p);
+    template<typename O, typename C, typename T, typename Input>
+    Parser<T, Input> between2(Parser<O> open, Parser<C> close, Parser<T, Input> p);
 
     // | "or" parses the left parser, then the right parser if the left one fails without consuming
-    template <typename T>
-    Parser<T> or_(const Parser<T>& left, const Parser<T>& right);
+    template <typename T, typename Input>
+    Parser<T, Input> or_(const Parser<T, Input>& left, const Parser<T, Input>& right);
 
     // Parses a given parser, doesn't consume input on failure
     // Commonly used with | "or" operator
-    template <typename T>
-    Parser<T> try_(Parser<T> p);
+    template <typename T, typename Input>
+    Parser<T, Input> try_(Parser<T, Input> p);
 
     // Parses p without consuming input. If p fails, it will consume input. Wrap p with try_ to avoid this.
-    template <typename T>
-    Parser<T> look_ahead(Parser<T> p);
+    template <typename T, typename Input>
+    Parser<T, Input> look_ahead(Parser<T, Input> p);
 
     // Succeeds only if p fails to parse. Never consumes input.
-    template <typename T>
-    Parser<std::monostate> not_followed_by(Parser<T> p);
+    template <typename T, typename Input>
+    Parser<std::monostate, Input> not_followed_by(Parser<T, Input> p);
 
     // Parses p if p passes a condition, failing if it doesn't
-    template<typename T>
-    Parser<T> satisfy(const Parser<T>& parser, std::function<bool(T)> cond);
+    template<typename T, typename Input>
+    Parser<T, Input> satisfy(const Parser<T, Input>& parser, std::function<bool(T)> cond);
 
     // Never consumes input and always succeeds, returns the value given. 
-    template <typename T>
-    Parser<T> success(T item);
+    template <typename Input, typename T>
+    Parser<T, Input> success(T item);
 
     // A parser which always fails without consuming input
-    template <typename T>
-    Parser<T> unexpected();
+    template <typename Input, typename T>
+    Parser<T, Input> unexpected();
 
     // Parses successfully only if the input is empty
-    template <typename T>
-    Parser<std::monostate> eof();
+    template <typename Input, typename T>
+    Parser<T, Input> eof();
 
     // Parses p, ignoring the result
     // Does not improve performance (return types are not lazy)
-    template<typename T>
-    Parser<std::monostate> skip(Parser<T> p);
+    template<typename T, typename Input>
+    Parser<std::monostate, typename Input> skip(Parser<T, typename Input> p);
 
     // Parses for an optional p, succeeds if p fails without consuming
-    template<typename T>
-    Parser<std::monostate> optional_(Parser<T> p);
+    template<typename T, typename Input>
+    Parser<std::monostate, Input> optional_(Parser<T, Input> p);
 
     // Parses for an optional p, succeeds if p fails without consuming
-    template<typename T>
-    Parser<std::optional<T>> optional_result(Parser<T> p);
+    template<typename T, typename Input>
+    Parser<std::optional<T>, Input> optional_result(Parser<T, Input> p);
 
     // Parse zero or more parses
-    template<typename T, PushBack<T> Container>
-    Parser<Container> many(Parser<T> p);
+    template<typename T, PushBack<T> Container, typename Input>
+    Parser<Container, Input> many(Parser<T, Input> p);
 
     // Parse one or more parses
-    template<typename T, PushBack<T> Container>
-    Parser<Container> many1(Parser<T> p);
+    template<typename T, PushBack<T> Container, typename Input>
+    Parser<Container, Input> many1(Parser<T, Input> p);
 
     // Parses p zero or more times until end succeeds, returning the parsed values
-    template <typename T, typename U, PushBack<T> Container>
-    Parser<Container> many_till(Parser<T> p, Parser<U> end);
+    template <typename T, typename U, PushBack<T> Container, typename Input>
+    Parser<Container, Input> many_till(Parser<T, Input> p, Parser<U, Input> end);
 
     // Parses p one or more times until end succeeds, returning the parsed values
-    template <typename T, typename U, PushBack<T> Container>
-    Parser<Container> many1_till(Parser<T> p, Parser<U> end);
+    template <typename T, typename U, PushBack<T> Container, typename Input>
+    Parser<Container, Input> many1_till(Parser<T, Input> p, Parser<U, Input> end);
 
     // Parses zero or more instances of p, ignores results
-    template <typename T>
-    Parser<std::monostate> skip_many(Parser<T> p);
+    template <typename T, typename Input>
+    Parser<std::monostate, Input> skip_many(Parser<T, Input> p);
 
     // Parses one or more instances of p, ignores results
-    template <typename T>
-    Parser<std::monostate> skip_many1(Parser<T> p);
+    template <typename T, typename Input>
+    Parser<std::monostate, Input> skip_many1(Parser<T, Input> p);
 
     // Parse zero or more parses of p separated by sep
-    template <typename T, typename U>
-    Parser<std::vector<T>> sep_by(Parser<T> p, Parser<U> sep);
+    template <typename T, typename U, typename Input>
+    Parser<std::vector<T>, Input> sep_by(Parser<T, Input> p, Parser<U, Input> sep);
 
     // Parse one or more parses of p separated by sep
-    template <typename T, typename U>
-    Parser<std::vector<T>> sep_by1(Parser<T> p, Parser<U> sep);
+    template <typename T, typename U, typename Input>
+    Parser<std::vector<T>, Input> sep_by1(Parser<T, Input> p, Parser<U, Input> sep);
 
     // Parse zero or more parses of p separated by and ending with sep
-    template <typename T, typename U>
-    Parser<std::vector<T>> end_by(Parser<T> p, Parser<U> sep);
+    template <typename T, typename U, typename Input>
+    Parser<std::vector<T>, Input> end_by(Parser<T, Input> p, Parser<U, Input> sep);
 
     // Parse one or more parses of p separated by and ending with sep
-    template <typename T, typename U>
-    Parser<std::vector<T>> end_by1(Parser<T> p, Parser<U> sep);
+    template <typename T, typename U, typename Input>
+    Parser<std::vector<T>, Input> end_by1(Parser<T, Input> p, Parser<U, Input> sep);
 
     // Parse one or more left associative applications of op to p, returning the
     // result of the repeated applications. Can be used to parse 1+2+3+4 as ((1+2)+3)+4
-    template <typename T>
-    Parser<T> chainl1(Parser<T> arg, Parser<std::function<T(T, T)>> op);
+    template <typename T, typename Input>
+    Parser<T, Input> chainl1(Parser<T, Input> arg, Parser<std::function<T(T, T)>, Input> op);
 
     // Parse zero or more left associative applications of op to p, returning the
     // result of the repeated applications. If there are zero applications, return backup.
-    template <typename T>
-    Parser<T> chainl(Parser<T> arg, Parser<std::function<T(T, T)>> op, T backup);
+    template <typename T, typename Input>
+    Parser<T, Input> chainl(Parser<T, Input> arg, Parser<std::function<T(T, T)>, Input> op, T backup);
 
     // Takes a std::function of a parser (not the parser itself) for deferred evaluation
     // Can be used to avoid infinite cycles in mutual recursion
-    template<typename T>
-    Parser<T> lazy(std::function<Parser<T>()> parser_func);
+    template<typename T, typename Input>
+    Parser<T, Input> lazy(std::function<Parser<T, Input>()> parser_func);
 
     // Takes a function pointer to a parser (not the parser itself) for deferred evaluation
     // Can be used to avoid infinite cycles in mutual recursion
-    template<typename T>
-    Parser<T> lazy(Parser<T>(*parser_func)());
+    template<typename T, typename Input>
+    Parser<T, Input> lazy(Parser<T, Input>(*parser_func)());
 
     // =========================== OPERATORS ==================================
 
     // << "ignore" operator returns the first result of two parsers
     // a << b is a.skip(b) 
-    template <typename T, typename U>
-    Parser<T> operator<<(const Parser<T> left, const Parser<U> right);
+    template <typename T, typename U, typename Input>
+    Parser<T, Input> operator<<(const Parser<T, Input> left, const Parser<U, Input> right);
 
     // >> "sequence" operator returns the second result of two parsers
     // a >> b is a.with(b) 
-    template <typename T, typename U>
-    Parser<U> operator>>(const Parser<T> left, const Parser<U> right);
+    template <typename T, typename U, typename Input>
+    Parser<U, Input> operator>>(const Parser<T, Input> left, const Parser<U, Input> right);
 
     // | "or" operator parses the left parser, then the right parser if the left one fails without consuming
-    template <typename T>
-    Parser<T> operator|(const Parser<T>& left, const Parser<T>& right);
+    template <typename T, typename Input>
+    Parser<T, Input> operator|(const Parser<T, Input>& left, const Parser<T, Input>& right);
 
     // & "and" operator joins two parses
-    template <typename T, typename U>
-    Parser<std::tuple<T, U>> operator&(const Parser<T> left, const Parser<U> right);
+    template <typename T, typename U, typename Input>
+    Parser<std::tuple<T, U>, Input> operator&(const Parser<T, Input> left, const Parser<U, Input> right);
 
     // & "and" operator joins a parse and multiple parses
-    template<typename T, typename... Ts>
-    Parser<std::tuple<T, Ts...>> operator&(const Parser<T>& left, const Parser<std::tuple<Ts...>>& right);
+    template<typename T, typename... Ts, typename Input>
+    Parser<std::tuple<T, Ts...>, Input> operator&(const Parser<T, Input>& left, const Parser<std::tuple<Ts...>, Input>& right);
 
     // & "and" operator joins multiple parses and a parse 
-    template<typename T, typename... Ts>
-    Parser<std::tuple<T, Ts...>> operator&(const Parser<std::tuple<Ts...>>& left, const Parser<T>& right);
+    template<typename T, typename... Ts, typename Input>
+    Parser<std::tuple<T, Ts...>, Input> operator&(const Parser<std::tuple<Ts...>, Input>& left, const Parser<T, Input>& right);
 
     // & "and" operator joins multiple parses and multiple parses
-    template<typename... Ts, typename... Us>
-    Parser<std::tuple<Ts..., Us...>> operator&(const Parser<std::tuple<Ts...>>& left, const Parser<std::tuple<Us...>>& right);
+    template<typename... Ts, typename... Us, typename Input>
+    Parser<std::tuple<Ts..., Us...>, Input> operator&(const Parser<std::tuple<Ts...>, Input>& left, const Parser<std::tuple<Us...>, Input>& right);
 
     // Add an error message to the parse result if it fails
     // Designed for debugging purposes, is slow
-    template <typename T>
-    Parser<T> operator^(Parser<T>&& p, std::string&& msg);
+    template <typename T, typename Input>
+    Parser<T, Input> operator^(Parser<T, Input>&& p, std::string&& msg);
 
     // Replace an error message from the parse result if it fails
     // Designed for debugging purposes, is slow
-    template <typename T>
-    Parser<T> operator%(Parser<T> p, std::string&& msg);
+    template <typename T, typename Input>
+    Parser<T, Input> operator%(Parser<T, Input> p, std::string&& msg);
 
     // ========================================================================
     // 
@@ -410,23 +383,23 @@ namespace cpparsec {
     // ================================ Parser ================================
 
     // Implementation detail, Parsers take ParseFunctions
-    // Use the CPPARSEC_DEFN macro for documented parsers
-    template <typename T, typename InputClass>
-    Parser<T, InputClass>::Parser(ParseFunction&& parser) :
+    // Use the CPPARSEC_MAKE macro for documented parsers
+    template <typename T, typename Input>
+    Parser<T, Input>::Parser(ParseFunction&& parser) :
         parser(std::move(parser))
     { }
 
     // Top level parser execution, parses a string
-    template <typename T, typename InputClass>
-    ParseResult<T> Parser<T, InputClass>::parse(const std::string& input) const {
+    template <typename T, typename Input>
+    ParseResult<T> Parser<T, Input>::parse(const std::string& input) const {
         InputStream view = input;
         return parser(view);
     }
 
     // Top level parser execution, parses a string_view
     // Parser consumes/modifies string_view
-    template <typename T, typename InputClass>
-    ParseResult<T> Parser<T, InputClass>::parse(Parser<T, InputClass>::InputStream& input) const {
+    template <typename T, typename Input>
+    ParseResult<T> Parser<T, Input>::parse(Parser<T, Input>::InputStream& input) const {
         InputStream view = input;
         auto result = parser(view);
         input = view;
@@ -434,10 +407,10 @@ namespace cpparsec {
     }
 
     // Parses self and other, returns result of other
-    template<typename T, typename InputClass>
+    template<typename T, typename Input>
     template<typename U>
-    Parser<U, InputClass> Parser<T, InputClass>::with(Parser<U, InputClass> other) const {
-        return CPPARSEC_DEFN_METHOD(thisParser, U) {
+    Parser<U, Input> Parser<T, Input>::with(Parser<U, Input> other) const {
+        return CPPARSEC_MAKE_METHOD(thisParser, Parser<U, Input>) {
             CPPARSEC_SKIP(thisParser);
             CPPARSEC_SAVE(result, other);
 
@@ -446,10 +419,10 @@ namespace cpparsec {
     }
 
     // Parses self and other, returns result of self
-    template<typename T, typename InputClass>
+    template<typename T, typename Input>
     template<typename U>
-    Parser<T, InputClass> Parser<T, InputClass>::skip(Parser<U, InputClass> other) const {
-        return CPPARSEC_DEFN_METHOD(thisParser, T) {
+    Parser<T, Input> Parser<T, Input>::skip(Parser<U, Input> other) const {
+        return CPPARSEC_MAKE_METHOD(thisParser, Parser<T, Input>) {
             CPPARSEC_SAVE(result, thisParser);
             CPPARSEC_SKIP(other);
 
@@ -457,11 +430,12 @@ namespace cpparsec {
         };
     }
 
+
     // Parses self and other, returns pair of both results
-    template<typename T, typename InputClass>
+    template<typename T, typename Input>
     template<typename U>
-    Parser<std::pair<T, U>> Parser<T, InputClass>::pair_with(Parser<U, InputClass> other) const {
-        return CPPARSEC_DEFN_METHOD(thisParser, std::pair<T, U>) {
+    Parser<std::pair<T, U>, Input> Parser<T, Input>::pair_with(Parser<U, Input> other) const {
+        return CPPARSEC_MAKE_METHOD(thisParser, Parser<std::pair<T, U>, Input>) {
             CPPARSEC_SAVE(a, thisParser);
             CPPARSEC_SAVE(b, other);
 
@@ -470,27 +444,37 @@ namespace cpparsec {
     }
 
     // Parses occurence satisfying a condition
-    template<typename T, typename InputClass>
-    Parser<T, InputClass> Parser<T, InputClass>::satisfy(std::function<bool(T)> cond) const {
-        return CPPARSEC_DEFN_METHOD(thisParser, T) {
-            ParseResult<T> result = thisParser(input);
+    template<typename T, typename Input>
+    Parser<T, Input> Parser<T, Input>::satisfy(std::function<bool(T)> cond) const {
+        return CPPARSEC_MAKE_METHOD(thisParser, Parser<T, Input>) {
+            ParseResult<T> result = thisParser.parse(input);
             CPPARSEC_FAIL_IF(!result || !cond(*result), std::format("Failed satisfy"));
 
             return result;
         };
     }
 
+    // Never consumes input and always succeeds, returns the value given. 
+    template<typename T, typename Input>
+    template <typename U>
+    Parser<U, Input> Parser<T, Input>::success(U item) {
+        return CPPARSEC_MAKE_METHOD(thisParser, Parser<U, Input>) {
+            CPPARSEC_SKIP(thisParser);
+            return item;
+        };
+    }
+
     // Parse occurence between two parses
-    template<typename T, typename InputClass>
+    template<typename T, typename Input>
     template<typename O, typename C>
-    Parser<T, InputClass> Parser<T, InputClass>::between(Parser<O, InputClass> open, Parser<C, InputClass> close) const {
+    Parser<T, Input> Parser<T, Input>::between(Parser<O, Input> open, Parser<C, Input> close) const {
         return open.with(*this).skip(close);
     }
 
     // | "or" operator parses the left parser, then the right parser if the left one fails without consuming
-    template <typename T, typename InputClass>
-    Parser<T, InputClass> Parser<T, InputClass>::or_(const Parser<T, InputClass>& right) const {
-        return CPPARSEC_DEFN_METHOD(thisParser, T) {
+    template <typename T, typename Input>
+    Parser<T, Input> Parser<T, Input>::or_(const Parser<T, Input>& right) const {
+        return CPPARSEC_MAKE_METHOD(thisParser, Parser<T, Input>) {
             auto starting_input = input;
             if (ParseResult<T> result = thisParser.parse(input)) {
                 return result;
@@ -504,9 +488,9 @@ namespace cpparsec {
     }
 
     // Parses p without consuming input on failure
-    template<typename T, typename InputClass>
-    Parser<T, InputClass> Parser<T, InputClass>::try_() const {
-        return CPPARSEC_DEFN_METHOD(thisParser, T) {
+    template<typename T, typename Input>
+    Parser<T, Input> Parser<T, Input>::try_() const {
+        return CPPARSEC_MAKE_METHOD(thisParser, Parser<T, Input>) {
             auto starting_input = input;
             ParseResult<T> result = thisParser.parse(input);
             if (!result) {
@@ -518,10 +502,10 @@ namespace cpparsec {
     }
 
     // Apply a function to the parse result
-    template<typename T, typename InputClass>
+    template<typename T, typename Input>
     template <typename U>
-    Parser<U, InputClass> Parser<T, InputClass>::transform(std::function<U(T)> func) const {
-        return CPPARSEC_DEFN_METHOD(thisParser, U) {
+    Parser<U, Input> Parser<T, Input>::transform(std::function<U(T)> func) const {
+        return CPPARSEC_MAKE_METHOD(thisParser, Parser<U, Input>) {
             ParseResult<T> result = thisParser.parse(input);
             return result.transform(func);
         };
@@ -530,9 +514,9 @@ namespace cpparsec {
     // ======================= Core Parser Combinators ========================
 
     // Parses given number of parses
-    template<typename T>
-    Parser<std::vector<T>> count(int n, Parser<T> p) {
-        return CPPARSEC_DEFN(std::vector<T>) {
+    template<typename T, typename Input>
+    Parser<std::vector<T>, Input> count(int n, Parser<T, Input> p) {
+        return CPPARSEC_MAKE(Parser<std::vector<T>, Input>) {
             std::vector<T> vec(n);
 
             for (int i = 0; i < n; i++) {
@@ -545,10 +529,10 @@ namespace cpparsec {
     }
 
     // Parses a sequence of functions, returning on the first successful result.
-    template<typename T, std::ranges::input_range Container>
-    Parser<T> choice(Container parsers) {
+    template<typename T, typename Input>
+    Parser<T, Input> choice(std::vector<Parser<T, Input>> parsers) {
         if (std::ranges::empty(parsers)) {
-            return unexpected<T>();
+            return unexpected<Input, T>();
         }
 
         return std::ranges::fold_left_first(parsers, std::bit_or<>{}).value();
@@ -556,16 +540,16 @@ namespace cpparsec {
 
     // Parse occurence between two parses
     // between(open, close, p) is open.with(p).skip(close) is open >> p << close
-    template<typename O, typename C, typename T>
-    Parser<T> between(Parser<O> open, Parser<C> close, Parser<T> p) {
+    template<typename O, typename C, typename T, typename Input>
+    Parser<T, Input> between(Parser<O> open, Parser<C> close, Parser<T, Input> p) {
         return open >> p << close;
     }
 
     // between 2
-    template<typename O, typename C, typename T>
-    Parser<T> between2(Parser<O> open, Parser<C> close, Parser<T> p) {
+    template<typename O, typename C, typename T, typename Input>
+    Parser<T, Input> between2(Parser<O> open, Parser<C> close, Parser<T, Input> p) {
         //return open >> p << close;
-        return CPPARSEC_DEFN(T) {
+        return CPPARSEC_MAKE(Parser<T, Input>) {
             CPPARSEC_SKIP(open);
             CPPARSEC_SAVE(middle, p);
             CPPARSEC_SKIP(close);
@@ -575,37 +559,37 @@ namespace cpparsec {
     }
 
     // | "or" parses the left parser, then the right parser if the left one fails without consuming
-    template <typename T>
-    Parser<T> or_(const Parser<T>& left, const Parser<T>& right) {
+    template <typename T, typename Input>
+    Parser<T, Input> or_(const Parser<T, Input>& left, const Parser<T, Input>& right) {
         return left.or_(right);
     }
 
     // Parses a given parser, doesn't consume input on failure
     // Commonly used with | "or" operator
-    template <typename T>
-    Parser<T> try_(Parser<T> p) {
+    template <typename T, typename Input>
+    Parser<T, Input> try_(Parser<T, Input> p) {
         return p.try_();
     }
 
     // Parses p without consuming input. If p fails, it will consume input. Wrap p with try_ to avoid this.
-    template <typename T>
-    Parser<T> look_ahead(Parser<T> p) {
-        return CPPARSEC_DEFN(T) {
-            auto input_copy = CPPARSEC_GET_INPUT;
+    template <typename T, typename Input>
+    Parser<T, Input> look_ahead(Parser<T, Input> p) {
+        return CPPARSEC_MAKE(Parser<T, Input>) {
+            auto input_copy = input;
             CPPARSEC_SAVE(value, p);
-            CPPARSEC_SET_INPUT(input_copy);
+            input = input_copy;
 
             return value;
         };
     }
 
     // Succeeds only if p fails to parse. Never consumes input.
-    template <typename T>
-    Parser<std::monostate> not_followed_by(Parser<T> p) {
-        return CPPARSEC_DEFN(std::monostate) {
-            auto input_copy = CPPARSEC_GET_INPUT;
+    template <typename T, typename Input>
+    Parser<std::monostate, Input> not_followed_by(Parser<T, Input> p) {
+        return CPPARSEC_MAKE(Parser<std::monostate, Input>) {
+            auto input_copy = input;
             ParseResult<T> result = p.parse(input);
-            CPPARSEC_SET_INPUT(input_copy);
+            input = input_copy;
             CPPARSEC_FAIL_IF(result.has_value(), ParseError("not_followed_by", "not_followed_by"));
 
             return std::monostate{};
@@ -615,7 +599,7 @@ namespace cpparsec {
     // Parses p if p passes a condition, failing if it doesn't
     template<typename T>
     Parser<T> satisfy(const Parser<T>& parser, std::function<bool(T)> cond) {
-        return CPPARSEC_DEFN_METHOD(thisParser, T) {
+        return CPPARSEC_MAKE_METHOD(thisParser, T) {
             ParseResult<T> result = thisParser(input);
             CPPARSEC_FAIL_IF(!result || !cond(*result), std::format("Failed satisfy"));
 
@@ -624,47 +608,65 @@ namespace cpparsec {
     }
 
     // Never consumes input and always succeeds, returns the value given. 
-    template <typename T>
-    Parser<T> success(T item) {
-        return CPPARSEC_DEFN(T) {
+    // Input type must be specified for custom Input types
+    template <typename Input = std::string_view, typename T>
+    Parser<T, Input> success(T item) {
+        return CPPARSEC_MAKE(Parser<T, Input>) {
             return item;
         };
     }
 
     // A parser which always fails without consuming input
-    template <typename T = std::monostate>
-    Parser<T> unexpected() {
-        return CPPARSEC_DEFN(T) {
+    // Input type must be specified for custom Input types
+    template <typename Input = std::string_view, typename T = std::monostate>
+    Parser<T, Input> unexpected() {
+        return CPPARSEC_MAKE(Parser<T, Input>) {
             CPPARSEC_FAIL(ParseError("unexpected"));
         };
     }
 
     // Parses successfully only if the input is empty
-    template <typename T = std::monostate>
-    Parser<std::monostate> eof() {
-        return CPPARSEC_DEFN(T) {
+    // Input type must be specified for custom Input types
+    template <typename Input = std::string_view, typename T = std::monostate>
+    Parser<T, Input> eof() {
+        return CPPARSEC_MAKE(Parser<T, Input>) {
             CPPARSEC_FAIL_IF(input.size() > 0, ParseError(std::format("{}", input.front()), "end of input"));
             return T{};
         };
     }
 
+    //// Parses p, ignoring the result
+    //// Does not improve performance (return types are not lazy)
+    //template<typename T>
+    //Parser<std::monostate> skip(Parser<T> p) {
+    //    return p >> success(std::monostate{});
+    //}
+
     // Parses p, ignoring the result
     // Does not improve performance (return types are not lazy)
-    template<typename T>
-    Parser<std::monostate> skip(Parser<T> p) {
-        return p >> success(std::monostate{});
+    template<typename T, typename Input>
+    Parser<std::monostate, Input> skip(Parser<T, Input> p) {
+        return p.success(std::monostate{});
+    }
+
+    //// Parses p, ignoring the result
+    //// Does not improve performance (return types are not lazy)
+    //template <typename T, typename Input>
+    //ParserType<std::monostate, Input> auto skip(ParserType<T, Input> auto p) {
+    //    return p >> success(std::monostate{});
+    //}
+
+
+    // Parses for an optional p, succeeds if p fails without consuming
+    template<typename T, typename Input>
+    Parser<std::monostate, Input> optional_(Parser<T, Input> p) {
+        return p.success(std::monostate{}) | success<Input>(std::monostate{});
     }
 
     // Parses for an optional p, succeeds if p fails without consuming
-    template<typename T>
-    Parser<std::monostate> optional_(Parser<T> p) {
-        return skip(p) | success(std::monostate{});
-    }
-
-    // Parses for an optional p, succeeds if p fails without consuming
-    template<typename T>
-    Parser<std::optional<T>> optional_result(Parser<T> p) {
-        return CPPARSEC_DEFN(std::optional<T>) {
+    template<typename T, typename Input>
+    Parser<std::optional<T>, Input> optional_result(Parser<T, Input> p) {
+        return CPPARSEC_MAKE(Parser<std::optional<T>, Input>) {
             auto start_point = input.data();
             ParseResult<T> result = p.parse(input);
             CPPARSEC_FAIL_IF(!result && start_point != input.data(), result.error()());
@@ -676,10 +678,10 @@ namespace cpparsec {
     }
 
     namespace detail {
-        template <typename T, PushBack<T> Container = std::vector<T>>
+        template <typename T, PushBack<T> Container = std::vector<T>, typename Input>
             requires std::movable<Container>
-        Parser<Container> many_accumulator(Parser<T> p, Container&& init = {}) {
-            return CPPARSEC_DEFN(Container) {
+        Parser<Container, Input> many_accumulator(Parser<T, Input> p, Container&& init = {}) {
+            return CPPARSEC_MAKE(Parser<Container, Input>) {
                 Container values(init);
 
                 while (true) {
@@ -703,15 +705,15 @@ namespace cpparsec {
     };
 
     // Parse zero or more parses
-    template<typename T, PushBack<T> Container = std::vector<T>>
-    Parser<Container> many(Parser<T> p) {
+    template<typename T, PushBack<T> Container = std::vector<T>, typename Input>
+    Parser<Container, Input> many(Parser<T, Input> p) {
         return detail::many_accumulator<T, Container>(p);
     }
 
     // Parse one or more parses
-    template<typename T, PushBack<T> Container = std::vector<T>>
-    Parser<Container> many1(Parser<T> p) {
-        return CPPARSEC_DEFN(std::vector<T>) {
+    template<typename T, PushBack<T> Container = std::vector<T>, typename Input>
+    Parser<Container, Input> many1(Parser<T, Input> p) {
+        return CPPARSEC_MAKE(Parser<Container, Input>) {
             CPPARSEC_SAVE(first, p);
             CPPARSEC_SAVE(values, detail::many_accumulator<T, Container>(p, { first }));
 
@@ -719,12 +721,11 @@ namespace cpparsec {
         };
     }
 
-
     namespace detail {
-        template <typename T, typename U, PushBack<T> Container = std::vector<T>>
+        template <typename T, typename U, PushBack<T> Container = std::vector<T>, typename Input>
             requires std::movable<Container>
-        Parser<Container> many_till_accumulator(Parser<T> p, Parser<U> end, Container&& init = {}) {
-            return CPPARSEC_DEFN(Container) {
+        Parser<Container, Input> many_till_accumulator(Parser<T, Input> p, Parser<U, Input> end, Container&& init = {}) {
+            return CPPARSEC_MAKE(Parser<Container, Input>) {
                 Container values(init);
 
                 while (true) {
@@ -750,26 +751,39 @@ namespace cpparsec {
     };
 
     // Parses p zero or more times until end succeeds, returning the parsed values
-    template <typename T, typename U, PushBack<T> Container = std::vector<T>>
-    Parser<Container> many_till(Parser<T> p, Parser<U> end) {
-        return detail::many_till_accumulator<T, U, Container>(p, end);
+    template <typename T, typename U, PushBack<T> Container = std::vector<T>, typename Input>
+    Parser<Container, Input> many_till(Parser<T, Input> p, Parser<U, Input> end) {
+        return detail::many_till_accumulator<T, U, Container, Input>(p, end);
     }
 
     // Parses p one or more times until end succeeds, returning the parsed values
-    template <typename T, typename U, PushBack<T> Container = std::vector<T>>
-    Parser<Container> many1_till(Parser<T> p, Parser<U> end) {
-        return CPPARSEC_DEFN(Container) {
+    template <typename T, typename U, PushBack<T> Container = std::vector<T>, typename Input>
+    Parser<Container, Input> many1_till(Parser<T, Input> p, Parser<U, Input> end) {
+        return CPPARSEC_MAKE(Parser<Container, Input>) {
             CPPARSEC_SAVE(first, p);
-            CPPARSEC_SAVE(values, detail::many_till_accumulator<T, U, Container>(p, end, { first }));
+            CPPARSEC_SAVE(values, detail::many_till_accumulator<T, U, Container, Input>(p, end, { first }));
 
             return values;
         };
     }
 
+
+    //template<typename T, typename Input, ParserType<T, Input> P>
+    //ParserType<T, Input> auto count(int n, P p) {
+    //    return cpparsec::_ParserFactory<std::vector<T>>() = [=](Parser<std::vector<T>>::InputStream& input)->cpparsec::ParseResult<std::vector<T>> {
+    //        std::vector<T> vec;
+    //        for (int i = 0; i < n; i++) {
+    //            CPPARSEC_SAVE(val, p);
+    //            vec.push_back(std::move(val));
+    //        }
+    //        return vec;
+    //    };
+    //}
+
     // Parses zero or more instances of p, ignores results
-    template <typename T>
-    Parser<std::monostate> skip_many(Parser<T> p) {
-        return CPPARSEC_DEFN(std::monostate) {
+    template <typename T, typename Input>
+    Parser<std::monostate, Input> skip_many(Parser<T, Input> p) {
+        return CPPARSEC_MAKE(Parser<std::monostate, Input>) {
             while (true) {
                 auto starting_point = input.data();
                 if (!p.parse(input)) {
@@ -788,15 +802,15 @@ namespace cpparsec {
     }
 
     // Parse zero or more parses of p separated by sep
-    template <typename T, typename U>
-    Parser<std::vector<T>> sep_by(Parser<T> p, Parser<U> sep) {
-        return sep_by1(p, sep) | success(std::vector<T>());
+    template <typename T, typename U, typename Input>
+    Parser<std::vector<T>, Input> sep_by(Parser<T, Input> p, Parser<U, Input> sep) {
+        return sep_by1(p, sep) | success<Input>(std::vector<T>());
     }
 
     // Parse one or more parses of p separated by sep
-    template <typename T, typename U>
-    Parser<std::vector<T>> sep_by1(Parser<T> p, Parser<U> sep) {
-        return CPPARSEC_DEFN(std::vector<T>) {
+    template <typename T, typename U, typename Input>
+    Parser<std::vector<T>, Input> sep_by1(Parser<T, Input> p, Parser<U, Input> sep) {
+        return CPPARSEC_MAKE(Parser<std::vector<T>, Input>) {
             CPPARSEC_SAVE(first, p);
             CPPARSEC_SAVE(values, detail::many_accumulator(sep >> p, { first }));
 
@@ -818,9 +832,9 @@ namespace cpparsec {
 
     // Parse one or more left associative applications of op to p, returning the
     // result of the repeated applications. Can be used to parse 1+2+3+4 as ((1+2)+3)+4
-    template <typename T>
-    Parser<T> chainl1(Parser<T> arg, Parser<std::function<T(T, T)>> op) {
-        return CPPARSEC_DEFN(T) {
+    template <typename T, typename Input>
+    Parser<T, Input> chainl1(Parser<T, Input> arg, Parser<std::function<T(T, T)>, Input> op) {
+        return CPPARSEC_MAKE(Parser<T, Input>) {
             CPPARSEC_SAVE(arg1, arg);
 
             while (true) {
@@ -841,25 +855,25 @@ namespace cpparsec {
 
     // Parse zero or more left associative applications of op to p, returning the
     // result of the repeated applications. If there are zero applications, return backup.
-    template <typename T>
-    Parser<T> chainl(Parser<T> arg, Parser<std::function<T(T, T)>> op, T backup) {
+    template <typename T, typename Input>
+    Parser<T, Input> chainl(Parser<T, Input> arg, Parser<std::function<T(T, T)>, Input> op, T backup) {
         return chainl1(arg, op) | success(backup);
     }
 
     // Takes a std::function of a parser (not the parser itself) for deferred evaluation
     // Can be used to avoid infinite cycles in mutual recursion
-    template<typename T>
-    Parser<T> lazy(std::function<Parser<T>()> parser_func) {
-        return CPPARSEC_DEFN(T) {
+    template<typename T, typename Input>
+    Parser<T, Input> lazy(std::function<Parser<T, Input>()> parser_func) {
+        return CPPARSEC_MAKE(Parser<T, Input>) {
             return parser_func().parse(input);
         };
     }
 
     // Takes a function pointer to a parser (not the parser itself) for deferred evaluation
     // Can be used to avoid infinite cycles in mutual recursion
-    template<typename T>
-    Parser<T> lazy(Parser<T>(*parser_func)()) {
-        return CPPARSEC_DEFN(T) {
+    template<typename T, typename Input>
+    Parser<T, Input> lazy(Parser<T, Input>(*parser_func)()) {
+        return CPPARSEC_MAKE(Parser<T, Input>) {
             return parser_func().parse(input);
         };
     }
@@ -868,28 +882,28 @@ namespace cpparsec {
 
     // << "ignore" operator returns the first result of two parsers
     // a << b is a.skip(b) 
-    template <typename T, typename U>
-    Parser<T> operator<<(const Parser<T> left, const Parser<U> right) {
+    template <typename T, typename U, typename Input>
+    Parser<T, Input> operator<<(const Parser<T, Input> left, const Parser<U, Input> right) {
         return left.skip(right);
     }
 
     // >> "sequence" operator returns the second result of two parsers
     // a >> b is a.with(b) 
-    template <typename T, typename U>
-    Parser<U> operator>>(const Parser<T> left, const Parser<U> right) {
+    template <typename T, typename U, typename Input>
+    Parser<U, Input> operator>>(const Parser<T, Input> left, const Parser<U, Input> right) {
         return left.with(right);
     }
 
     // | "or" operator parses the left parser, then the right parser if the left one fails without consuming
-    template <typename T>
-    Parser<T> operator|(const Parser<T>& left, const Parser<T>& right) {
+    template <typename T, typename Input>
+    Parser<T, Input> operator|(const Parser<T, Input>& left, const Parser<T, Input>& right) {
         return left.or_(right);
     }
 
     // & "and" operator joins two parses
-    template <typename T, typename U>
-    Parser<std::tuple<T, U>> operator&(const Parser<T> left, const Parser<U> right) {
-        return CPPARSEC_DEFN(std::tuple<T, U>) {
+    template <typename T, typename U, typename Input>
+    Parser<std::tuple<T, U>, Input> operator&(const Parser<T, Input> left, const Parser<U, Input> right) {
+        return CPPARSEC_MAKE(Parser<std::tuple<T, U>, Input>) {
             CPPARSEC_SAVE(a, left);
             CPPARSEC_SAVE(b, right);
 
@@ -898,9 +912,9 @@ namespace cpparsec {
     }
 
     // & "and" operator joins a parse and multiple parses
-    template<typename T, typename... Ts>
-    Parser<std::tuple<T, Ts...>> operator&(const Parser<T>& left, const Parser<std::tuple<Ts...>>& right) {
-        return CPPARSEC_DEFN(std::tuple<T, Ts...>) {
+    template<typename T, typename... Ts, typename Input>
+    Parser<std::tuple<T, Ts...>, Input> operator&(const Parser<T, Input>& left, const Parser<std::tuple<Ts...>, Input>& right) {
+        return CPPARSEC_MAKE(Parser<std::tuple<T, Ts...>, Input>) {
             CPPARSEC_SAVE(a, left);
             CPPARSEC_SAVE(bs, right);
 
@@ -909,9 +923,9 @@ namespace cpparsec {
     }
 
     // & "and" operator joins multiple parses and a parse 
-    template<typename T, typename... Ts>
-    Parser<std::tuple<T, Ts...>> operator&(const Parser<std::tuple<Ts...>>& left, const Parser<T>& right) {
-        return CPPARSEC_DEFN(std::tuple<T, Ts...>) {
+    template<typename T, typename... Ts, typename Input>
+    Parser<std::tuple<T, Ts...>, Input> operator&(const Parser<std::tuple<Ts...>, Input>& left, const Parser<T, Input>& right) {
+        return CPPARSEC_MAKE(Parser<std::tuple<T, Ts...>, Input>) {
             CPPARSEC_SAVE(as, left);
             CPPARSEC_SAVE(b, right);
 
@@ -920,9 +934,9 @@ namespace cpparsec {
     }
 
     // & "and" operator joins multiple parses and multiple parses
-    template<typename... Ts, typename... Us>
-    Parser<std::tuple<Ts..., Us...>> operator&(const Parser<std::tuple<Ts...>>& left, const Parser<std::tuple<Us...>>& right) {
-        return CPPARSEC_DEFN(std::tuple<Ts..., Us...>) {
+    template<typename... Ts, typename... Us, typename Input>
+    Parser<std::tuple<Ts..., Us...>, Input> operator&(const Parser<std::tuple<Ts...>, Input>& left, const Parser<std::tuple<Us...>, Input>& right) {
+        return CPPARSEC_MAKE(Parser<std::tuple<Ts..., Us...>, Input>) {
             CPPARSEC_SAVE(as, left);
             CPPARSEC_SAVE(bs, right);
 
@@ -932,10 +946,10 @@ namespace cpparsec {
 
     // Add an error message to the parse result if it fails
     // Designed for debugging, poor performance
-    template <typename T>
-    Parser<T> operator^(Parser<T>&& p, std::string&& msg) {
+    template <typename T, typename Input>
+    Parser<T, Input> operator^(Parser<T, Input>&& p, std::string&& msg) {
         //return p;
-        return CPPARSEC_DEFN(T) {
+        return CPPARSEC_MAKE(Parser<T, Input>) {
             ParseResult<T> result = p.parse(input);
             if (!result) {
                 ParseError err = result.error()();
@@ -948,9 +962,9 @@ namespace cpparsec {
 
     // Replace an error message from the parse result if it fails
     // Designed for debugging, poor performance
-    template <typename T>
-    Parser<T> operator%(Parser<T> p, std::string&& msg) {
-        return CPPARSEC_DEFN(T) {
+    template <typename T, typename Input>
+    Parser<T, Input> operator%(Parser<T, Input> p, std::string&& msg) {
+        return CPPARSEC_MAKE(Parser<T, Input>) {
             ParseResult<T> result = p.parse(input);
             if (!result.has_value()) {
                 CPPARSEC_FAIL(ParseError({ msg }));
@@ -960,7 +974,6 @@ namespace cpparsec {
     }
 
 };
-
 // needs to be outside namespace to be seen by fmt
 template <>
 struct std::formatter<typename cpparsec::ParseError<>::ErrorContent> {
@@ -984,7 +997,7 @@ struct std::formatter<typename cpparsec::ParseError<>::ErrorContent> {
             else if constexpr (std::is_same_v<V, std::monostate>) {
                 return std::format_to(ctx.out(), "empty error");
             }
-            }, error);
+        }, error);
     }
 };
 

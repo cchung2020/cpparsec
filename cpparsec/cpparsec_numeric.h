@@ -8,9 +8,4 @@ namespace cpparsec {
         return many1(digit()).transform<int>([](auto&& s) { return std::stoi(s); });
     }
 
-    // Parses an int faster
-    inline Parser<int> int2_() {
-        return many1(digit2()).transform<int>([](auto&& s) { return std::stoi(s); });
-    }
-
 };

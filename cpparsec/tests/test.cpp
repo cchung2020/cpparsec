@@ -17,7 +17,6 @@ BOOST_AUTO_TEST_SUITE(Character_Parsers)
 
 BOOST_AUTO_TEST_CASE(Char_Parser_Success)
 {
-
     string inputStr = "aabab";
     string_view input = inputStr;
 
@@ -521,7 +520,7 @@ BOOST_AUTO_TEST_CASE(Choice_Parser_Multiple_Choices)
     string inputStr = "two threeten two tenEND";
     string_view input = inputStr;
 
-    Parser<int> t_skeleton_nums = choice<int>(vector({
+    Parser<int> t_skeleton_nums = choice(vector({
         try_(string_("two") >> spaces() >> success(2)),
         try_(string_("three") >> spaces() >> success(3)),
         try_(string_("ten") >> spaces() >> success(10)),
