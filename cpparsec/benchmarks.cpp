@@ -9,6 +9,16 @@
 using std::string, std::vector;
 using namespace cpparsec;
 
+inline Parser<std::string> inefficient_string(const std::string& str) {
+    return CPPARSEC_MAKE(Parser<std::string>) {
+        for (auto c : str) {
+            CPPARSEC_SKIP(char_(c));
+        }
+
+        return str;
+    };
+}
+
 Parser<vector<string>> string_csv() {
     auto nonCommaChar = [](char c) { return (c != ','); };
     return sep_by1(many(char_satisfy(nonCommaChar)), char_(','));
@@ -17,24 +27,39 @@ Parser<vector<string>> string_csv() {
 int main() {
     bool _ignore = false;
 
-    string str_csv_input = "a, bc, def, ghij, jklmnop, qrestuvwxyz, dsiadisandiosndioni, daiondidsajhio dhsiofsdhuihrfsdfhdsifhniosdafoisadfni";
-
-    ankerl::nanobench::Bench().run("string parser", [&] {
-        ParseResult<string> num = string_("dsavg3@#()HRJNDI").parse("dsavg3@#()HRJNDI");
+    ankerl::nanobench::Bench().minEpochIterations(1000000).run("char parser", [&] {
+        ParseResult<char> num = char_('x').parse("x");
         ankerl::nanobench::doNotOptimizeAway(_ignore);
         });
-    
-    ankerl::nanobench::Bench().run("integer parser", [&] {
+
+    ankerl::nanobench::Bench().minEpochIterations(1000000).run("char parser error reporting", [&] {
+        ParseResult<char> num = char_('x').parse("y");
+        ankerl::nanobench::doNotOptimizeAway(_ignore);
+        });
+
+    ankerl::nanobench::Bench().minEpochIterations(100000).run("string parser", [&] {
+        ParseResult<string> str = string_("dsavg3@#()HRJNDI").parse("dsavg3@#()HRJNDI");
+        ankerl::nanobench::doNotOptimizeAway(_ignore);
+        });
+
+    ankerl::nanobench::Bench().minEpochIterations(100000).run("inefficient_string parser", [&] {
+        ParseResult<string> str = inefficient_string("dsavg3@#()HRJNDI").parse("dsavg3@#()HRJNDI");
+        ankerl::nanobench::doNotOptimizeAway(_ignore);
+        });
+
+    ankerl::nanobench::Bench().minEpochIterations(100000).run("integer parser", [&] {
         ParseResult<int> num = int_().parse("23554567");
         ankerl::nanobench::doNotOptimizeAway(_ignore);
     });
 
-    ankerl::nanobench::Bench().run("integer parser error reporting", [&] {
+    ankerl::nanobench::Bench().minEpochIterations(100000).run("integer parser error reporting", [&] {
         ParseResult<int> num = int_().parse("X");
         ankerl::nanobench::doNotOptimizeAway(_ignore);
     });
 
-    ankerl::nanobench::Bench().run("CSV string parser", [&] {
+    string str_csv_input = "a, bc, def, ghij, jklmnop, qrestuvwxyz, dsiadisandiosndioni, daiondidsajhio dhsiofsdhuihrfsdfhdsifhniosdafoisadfni";
+
+    ankerl::nanobench::Bench().minEpochIterations(20000).run("CSV string parser", [&] {
         ParseResult<vector<string>> strs = string_csv().parse(str_csv_input);
 
         ankerl::nanobench::doNotOptimizeAway(_ignore);

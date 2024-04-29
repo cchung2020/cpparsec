@@ -188,6 +188,16 @@ void time_parse(Parser<T> p, int cases, string&& test, string&& msg = "") {
 
 //Parser<std::pair<int, std::string>> cube2();
 
+inline Parser<std::string> inefficient_string(const std::string& str) {
+    return CPPARSEC_MAKE(Parser<std::string>) {
+        for (auto c : str) {
+            CPPARSEC_SKIP(char_(c));
+        }
+
+        return str;
+    };
+}
+
 int main() {
     //printFormatted(2);
     //auto x = (cube2() % "cubeParser failed").parse("3 red");
@@ -208,10 +218,14 @@ int main() {
     //time_parse(char_('1').or_(char_('4')).or_(char_('2')).or_(char_('4')), 2000000, "4", "4444");
     //time_parse(char_('4').or_(char_('1')).or_(char_('3')).or_(char_('4')), 2000000, "4", "4444");
 
-    ParseResult<vector<string>> x = many1(string_("test")).parse("testtest");
+    time_parse(string_("testtesttest"), 2000000, "testtesttest", "str");
+    time_parse(inefficient_string("testtesttest"), 2000000, "testtesttest", "badstr");
 
-    time_parse(int_(), 2000000, "12345123", "regular int, 12345123");
-    time_parse(int_(), 2000000, "a12345123", "regular int, a12345123 (err)");
+
+    //ParseResult<vector<string>> x = many1(string_("test")).parse("testtest");
+
+    //time_parse(int_(), 2000000, "12345123", "regular int, 12345123");
+    //time_parse(int_(), 2000000, "a12345123", "regular int, a12345123 (err)");
 
     //time_parse(string_("tttttwo").or_(string_("ttttthree")), 2000000, "ttttthree", "tttt");
     //time_parse(string_("tttttwo").or_(string_("ttttthree")), 2000000, "tttttwo", "tttt");
