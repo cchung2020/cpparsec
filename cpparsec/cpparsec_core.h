@@ -630,7 +630,7 @@ namespace cpparsec {
     template <typename Input = std::string_view, typename T = std::monostate>
     Parser<T, Input> eof() {
         return CPPARSEC_MAKE(Parser<T, Input>) {
-            CPPARSEC_FAIL_IF(input.size() > 0, ParseError(std::format("{}", input.front()), "end of input"));
+            CPPARSEC_FAIL_IF(input.size() > 0, ParseError(std::format("{}", *input.begin()), "end of input"));
             return T{};
         };
     }

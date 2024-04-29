@@ -19,6 +19,9 @@
     <Filter Include="Tests">
       <UniqueIdentifier>{8febb5f3-09e2-4ead-bb1e-a98850747539}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Benchmarks">
+      <UniqueIdentifier>{79c042f2-146c-4e8e-8fc4-2c6d3440ded1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -32,6 +35,9 @@
     </ClCompile>
     <ClCompile Include="tests\test_alt_char.cpp">
       <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="benchmarks.cpp">
+      <Filter>Benchmarks</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -49,6 +55,12 @@
     </ClInclude>
     <ClInclude Include="cpparsec_char_alt_example.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cpparsec_byteparse_example.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="benchmarks\nanobench.h">
+      <Filter>Benchmarks</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
