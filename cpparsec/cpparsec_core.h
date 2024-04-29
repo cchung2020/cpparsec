@@ -448,7 +448,7 @@ namespace cpparsec {
     Parser<T, Input> Parser<T, Input>::satisfy(std::function<bool(T)> cond) const {
         return CPPARSEC_MAKE_METHOD(thisParser, Parser<T, Input>) {
             ParseResult<T> result = thisParser.parse(input);
-            CPPARSEC_FAIL_IF(!result || !cond(*result), std::format("Failed satisfy"));
+            CPPARSEC_FAIL_IF(!result || !cond(*result), result.error());
 
             return result;
         };
@@ -974,6 +974,7 @@ namespace cpparsec {
     }
 
 };
+
 // needs to be outside namespace to be seen by fmt
 template <>
 struct std::formatter<typename cpparsec::ParseError<>::ErrorContent> {

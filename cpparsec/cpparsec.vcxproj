@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug UnitTests|Win32">
@@ -270,6 +270,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cpparsec.h" />
+    <ClInclude Include="cpparsec_byteparse_example.h" />
     <ClInclude Include="cpparsec_char.h" />
     <ClInclude Include="cpparsec_char_alt_example.h" />
     <ClInclude Include="cpparsec_core.h" />

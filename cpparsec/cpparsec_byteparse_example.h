@@ -1,6 +1,7 @@
 #ifndef CPPARSEC_CHAR_ALT_EXAMPLE_H
 #define CPPARSEC_CHAR_ALT_EXAMPLE_H
 
+#include <cstddef>
 #include "cpparsec_core.h"
 
 namespace cpparsec_example {
@@ -18,65 +19,6 @@ namespace cpparsec_example {
 
     // eventually this character counting behavior will be the default behavior
 
-    class CustomStrView {
-    private:
-        std::string_view view;
-        size_t chars_consumed, line;
-
-    public:
-        CustomStrView(const std::string& str) : view(str), chars_consumed(0), line(0) {}
-
-        using const_iterator = std::string_view::const_iterator;
-
-        // functions for accessing the underlying view
-        size_t size() { return view.size(); }
-        auto data() { return view.data(); }
-        bool empty() { return view.empty(); }
-        const_iterator begin() { return view.begin(); }
-        const_iterator end() { return view.end(); }
-        const char& front() const { return view.front(); }
-        const char& back() const { return view.back(); }
-        auto& operator[](size_t n) { return view[n]; }
-        const auto& operator[](size_t n) const { return view[n]; }
-        std::string_view substr(size_t offset, size_t count) { return view.substr(offset, count); }
-
-        void remove_prefix(size_t n) {
-            //for (int i = 0; i < n; i++) {
-            //    if (view[i] == '\n') {
-            //        line++;
-            //    }
-            //}
-            line += std::ranges::count(view | std::views::take(n), '\n');
-            chars_consumed += n;
-            view.remove_prefix(n);
-        }
-
-        size_t get_chars_consumed() {
-            return chars_consumed;
-        }
-        size_t get_lines_consumed() {
-            return chars_consumed;
-        }
-
-        const std::string_view get_view() {
-            return view;
-        }
-    };
-
-    bool operator==(CustomStrView s1, const std::string& s2) {
-        return s1.get_view() == s2;
-    }
-    bool operator==(const std::string& s1, CustomStrView s2) {
-        return s1 == s2.get_view();
-    }
-
-    //template <typename T>
-    //struct CharParser : public Parser<T, std::string_view> {
-    //    using Parser<T, std::string_view>::Parser; 
-
-    //    CharParser(const Parser<T, std::string_view>& other) : Parser<T, std::string_view>(other) {}
-    //    CharParser(Parser<T, std::string_view>&& other) : Parser<T, std::string_view>(std::move(other)) {}
-    //};
 
     template <typename T>
     using CharParser = Parser<T, CustomStrView>;
