@@ -38,12 +38,12 @@ int main() {
         });
 
     ankerl::nanobench::Bench().minEpochIterations(100000).run("string parser", [&] {
-        ParseResult<string> str = string_("dsavg3@#()HRJNDI").parse("dsavg3@#()HRJNDI");
+        ParseResult<string> str = string_("longstringtesterjontester").parse("longstringtesterjontester");
         ankerl::nanobench::doNotOptimizeAway(_ignore);
         });
 
     ankerl::nanobench::Bench().minEpochIterations(100000).run("inefficient_string parser", [&] {
-        ParseResult<string> str = inefficient_string("dsavg3@#()HRJNDI").parse("dsavg3@#()HRJNDI");
+        ParseResult<string> str = inefficient_string("longstringtesterjontester").parse("longstringtesterjontester");
         ankerl::nanobench::doNotOptimizeAway(_ignore);
         });
 

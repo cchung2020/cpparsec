@@ -114,6 +114,7 @@ namespace cpparsec {
         using Item = T;
         using InputStream = Input;
         using ParseFunction = std::function<ParseResult<T>(InputStream&)>; // ParseResult<T>(*)(InputStream&)
+              // function takes InputStream, returns ParserResult<T>
 
     private:
         ParseFunction parser;
@@ -191,7 +192,7 @@ namespace cpparsec {
 
     // between 2
     template<typename O, typename C, typename T, typename Input>
-    Parser<T, Input> between2(Parser<O> open, Parser<C> close, Parser<T, Input> p);
+    Parser<T, Input> between3(Parser<O> open, Parser<C> close, Parser<T, Input> p);
 
     // | "or" parses the left parser, then the right parser if the left one fails without consuming
     template <typename T, typename Input>
@@ -539,20 +540,29 @@ namespace cpparsec {
     }
 
     // Parse occurence between two parses
-    // between(open, close, p) is open.with(p).skip(close) is open >> p << close
     template<typename O, typename C, typename T, typename Input>
     Parser<T, Input> between(Parser<O> open, Parser<C> close, Parser<T, Input> p) {
         return open >> p << close;
     }
 
-    // between 2
     template<typename O, typename C, typename T, typename Input>
     Parser<T, Input> between2(Parser<O> open, Parser<C> close, Parser<T, Input> p) {
-        //return open >> p << close;
-        return CPPARSEC_MAKE(Parser<T, Input>) {
-            CPPARSEC_SKIP(open);
-            CPPARSEC_SAVE(middle, p);
-            CPPARSEC_SKIP(close);
+        return open.with(p).skip(close);
+    }
+
+    template<typename O, typename C, typename T, typename Input>
+    Parser<T, Input> between3(Parser<O> open, Parser<C> close, Parser<T, Input> p) {
+        return cpparsec::_ParserFactory<Parser<T, Input>>() = [=](Parser<T, Input>::InputStream& input)->cpparsec::ParseResult<typename Parser<T, Input>::Item> {
+            if (auto&& _cpparsec_skipresult = (open).parse(input); !_cpparsec_skipresult) {
+                return std::unexpected(std::move(_cpparsec_skipresult.error()));
+            };
+            auto&& _middle_ = (p).parse(input); if (!_middle_.has_value()) {
+                return std::unexpected(std::move(_middle_.error()));
+            } 
+            auto&& middle = _middle_.value();
+            if (auto&& _cpparsec_skipresult = (close).parse(input); !_cpparsec_skipresult) {
+                return std::unexpected(std::move(_cpparsec_skipresult.error()));
+            };
 
             return middle;
         };

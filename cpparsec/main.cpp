@@ -186,6 +186,21 @@ void time_parse(Parser<T> p, int cases, string&& test, string&& msg = "") {
     println("error: {} {}\n", duration_cast<chrono::milliseconds>(end - start), msg);
 }
 
+Parser<string> name() {
+    return CPPARSEC_MAKE(Parser<string>) {
+        CPPARSEC_SAVE(firstLetter, upper());
+        CPPARSEC_SAVE(restOfName, many(letter()));
+
+        return string({ firstLetter }) + restOfName;
+    };
+}
+
+//Parser<string> name() {
+//    return CPPARSEC_MAKE(Parser<string>) {
+//        char
+//    }
+//}
+
 //Parser<std::pair<int, std::string>> cube2();
 
 inline Parser<std::string> inefficient_string(const std::string& str) {

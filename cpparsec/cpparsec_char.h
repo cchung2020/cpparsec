@@ -109,7 +109,7 @@ namespace cpparsec {
 
     // ======================== Core Character Parsers ========================
 
-        // Parses a single character
+    // Parses a single character
     inline Parser<char> char_(char c) {
         return CPPARSEC_MAKE(Parser<char>) {
             CPPARSEC_FAIL_IF(input.empty(), ParseError("end of input", { c }));

@@ -1,3 +1,6 @@
+#ifndef CPPARSEC_NUMERIC_H
+#define CPPARSEC_NUMERIC_H
+
 #include "cpparsec.h"
 
 namespace cpparsec {
@@ -9,3 +12,5 @@ namespace cpparsec {
     }
 
 };
+
+#endif /* CPPARSEC_NUMERIC_H */

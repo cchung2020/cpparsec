@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cpparsec", "cpparsec\cppars
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Benchmarks-Debug|x64 = Benchmarks-Debug|x64
+		Benchmarks-Debug|x86 = Benchmarks-Debug|x86
 		Benchmarks-Release|x64 = Benchmarks-Release|x64
 		Benchmarks-Release|x86 = Benchmarks-Release|x86
 		Debug UnitTests|x64 = Debug UnitTests|x64
@@ -19,6 +21,10 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8EE0CB4F-D0D6-43EF-A732-426326649D01}.Benchmarks-Debug|x64.ActiveCfg = Benchmarks-Debug|x64
+		{8EE0CB4F-D0D6-43EF-A732-426326649D01}.Benchmarks-Debug|x64.Build.0 = Benchmarks-Debug|x64
+		{8EE0CB4F-D0D6-43EF-A732-426326649D01}.Benchmarks-Debug|x86.ActiveCfg = Benchmarks-Debug|Win32
+		{8EE0CB4F-D0D6-43EF-A732-426326649D01}.Benchmarks-Debug|x86.Build.0 = Benchmarks-Debug|Win32
 		{8EE0CB4F-D0D6-43EF-A732-426326649D01}.Benchmarks-Release|x64.ActiveCfg = Benchmarks-Release|x64
 		{8EE0CB4F-D0D6-43EF-A732-426326649D01}.Benchmarks-Release|x64.Build.0 = Benchmarks-Release|x64
 		{8EE0CB4F-D0D6-43EF-A732-426326649D01}.Benchmarks-Release|x86.ActiveCfg = Benchmarks-Release|Win32

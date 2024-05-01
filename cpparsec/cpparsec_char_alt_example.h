@@ -63,6 +63,9 @@ namespace cpparsec_example {
         }
     };
 
+    template <typename T>
+    using CharParser = Parser<T, CustomStrView>;
+
     bool operator==(CustomStrView s1, const std::string& s2) {
         return s1.get_view() == s2;
     }
