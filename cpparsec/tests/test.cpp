@@ -512,6 +512,53 @@ BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+// --------------------------- Satisfy Parsers ---------------------------
+
+BOOST_AUTO_TEST_SUITE(Satisfy_Parsers)
+
+BOOST_AUTO_TEST_CASE(Char_Satisfy_Success)
+{
+    string inputStr = "abc";
+    string_view input = inputStr;
+
+    auto is_a = [](char c) { return c == 'a'; };
+    Parser<char> a = char_satisfy(is_a, "not a");
+    ParseResult<char> result = a.parse(input);
+
+    BOOST_REQUIRE(result.has_value());
+    BOOST_CHECK(*result == 'a');
+    BOOST_CHECK(input == "bc");
+}
+
+BOOST_AUTO_TEST_CASE(Satisfy_IsDigit_Success)
+{
+    string inputStr = "1abc";
+    string_view input = inputStr;
+
+    auto is_digit = [](char c) { return isdigit(c); };
+    Parser<char> digit_parser = satisfy<char>(any_char(), is_digit);
+    ParseResult<char> result = digit_parser.parse(input);
+
+    BOOST_REQUIRE(result.has_value());
+    BOOST_CHECK(*result == '1');
+    BOOST_CHECK(input == "abc");
+}
+
+BOOST_AUTO_TEST_CASE(Satisfy_IsDigit_Failure)
+{
+    string inputStr = "a1bc";
+    string_view input = inputStr;
+
+    auto is_digit = [](char c) { return isdigit(c); };
+    Parser<char> digit_parser = satisfy<char>(any_char(), is_digit);
+    ParseResult<char> result = digit_parser.parse(input);
+
+    BOOST_REQUIRE(!result.has_value());
+    BOOST_CHECK(result.error()().message() == "Failed satisfy");
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
 // --------------------------- Choice Parsers ---------------------------
 BOOST_AUTO_TEST_SUITE(Choice_Parsers)
 

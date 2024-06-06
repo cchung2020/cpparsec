@@ -163,6 +163,13 @@ namespace cpparsec {
         // Apply a function to the parse result
         template <typename U>
         Parser<U, Input> transform(std::function<U(T)> func) const;
+
+        //// Apply a function to the parse result
+        //Parser<auto, Input> transform(auto func) const {
+        //    return CPPARSEC_MAKE_METHOD(thisParser, Parser<auto, Input>) {
+        //    ParseResult<T> result = thisParser.parse(input);
+        //    return result.transform(func);
+        //};
     };
 
     // ============================ PARSER FACTORY ============================
@@ -213,7 +220,7 @@ namespace cpparsec {
 
     // Parses p if p passes a condition, failing if it doesn't
     template<typename T, typename Input>
-    Parser<T, Input> satisfy(const Parser<T, Input>& parser, std::function<bool(T)> cond);
+    Parser<T, Input> satisfy(const Parser<T, Input>& parser, auto cond);
 
     // Never consumes input and always succeeds, returns the value given. 
     template <typename Input, typename T>
@@ -232,7 +239,7 @@ namespace cpparsec {
     template<typename T, typename Input>
     Parser<std::monostate, typename Input> skip(Parser<T, typename Input> p);
 
-    // Parses for an optional p, succeeds if p fails without consuming
+    // Parses for an optional p, succeeds if p fails without consuming, ignoring the result
     template<typename T, typename Input>
     Parser<std::monostate, Input> optional_(Parser<T, Input> p);
 
@@ -607,10 +614,10 @@ namespace cpparsec {
     }
 
     // Parses p if p passes a condition, failing if it doesn't
-    template<typename T>
-    Parser<T> satisfy(const Parser<T>& parser, std::function<bool(T)> cond) {
-        return CPPARSEC_MAKE_METHOD(thisParser, T) {
-            ParseResult<T> result = thisParser(input);
+    template<typename T, typename Input>
+    Parser<T, Input> satisfy(const Parser<T, Input>& p, auto cond) {
+        return CPPARSEC_MAKE(Parser<T, Input>) {
+            ParseResult<T> result = p.parse(input);
             CPPARSEC_FAIL_IF(!result || !cond(*result), std::format("Failed satisfy"));
 
             return result;
@@ -683,8 +690,6 @@ namespace cpparsec {
 
             return (result ? std::optional(result.value()) : std::nullopt);
         };
-        // WIP
-        //return p.transform([](auto r) { return std::optional(r); }) | std::nullopt;
     }
 
     namespace detail {

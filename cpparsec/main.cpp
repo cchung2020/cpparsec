@@ -4,6 +4,7 @@
 #include <utility>
 #include "cpparsec.h"
 #include "cpparsec_numeric.h"
+#include <memory>
 
 using namespace cpparsec;
 using namespace std;
@@ -213,7 +214,39 @@ inline Parser<std::string> inefficient_string(const std::string& str) {
     };
 }
 
+cpparsec::Parser<int> parse_integer() {
+    using namespace cpparsec;
+
+    // Parser for a sequence of digits
+    auto digits_parser = many1(digit());
+
+    // Transform the parsed sequence of digits (std::string) to an integer
+
+    auto integer_parser = 
+        digits_parser.transform<int>([](std::string digits) -> int {
+            return std::stoi(digits);
+        });
+
+    
+    return integer_parser;
+}
+
+template <std::integral T>
+T add(T a, T b) {
+    return a + b;
+}
+
+
+vector<int>* fn() {
+    int var;
+    return new vector<int>({1,2,3,4});
+}
+
 int main() {
+    vector<int>* vec2 = fn();
+
+    delete vec2;
+
     //printFormatted(2);
     //auto x = (cube2() % "cubeParser failed").parse("3 red");
     //if (x) {
@@ -235,7 +268,6 @@ int main() {
 
     time_parse(string_("testtesttest"), 2000000, "testtesttest", "str");
     time_parse(inefficient_string("testtesttest"), 2000000, "testtesttest", "badstr");
-
 
     //ParseResult<vector<string>> x = many1(string_("test")).parse("testtest");
 
