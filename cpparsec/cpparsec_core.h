@@ -993,7 +993,7 @@ namespace cpparsec {
 // needs to be outside namespace to be seen by fmt
 template <>
 struct std::formatter<typename cpparsec::ParseError<>::ErrorContent> {
-    auto parse(std::format_parse_context& ctx) {
+    constexpr auto parse(std::format_parse_context& ctx) {
         return ctx.end();
     }
 
