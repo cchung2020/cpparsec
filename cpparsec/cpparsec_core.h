@@ -161,8 +161,9 @@ namespace cpparsec {
         Parser<T, Input> try_() const;
 
         // Apply a function to the parse result
+        // Not recommended, Parsec-style function application is faster
         template <typename U>
-        Parser<U, Input> transform(std::function<U(T)> func) const;
+        Parser<U, Input> transform(auto&& func) const;
 
         //// Apply a function to the parse result
         //Parser<auto, Input> transform(auto func) const {
@@ -312,12 +313,12 @@ namespace cpparsec {
     // << "ignore" operator returns the first result of two parsers
     // a << b is a.skip(b) 
     template <typename T, typename U, typename Input>
-    Parser<T, Input> operator<<(const Parser<T, Input> left, const Parser<U, Input> right);
+    Parser<T, Input> operator<<(const Parser<T, Input>& left, const Parser<U, Input>& right);
 
     // >> "sequence" operator returns the second result of two parsers
     // a >> b is a.with(b) 
     template <typename T, typename U, typename Input>
-    Parser<U, Input> operator>>(const Parser<T, Input> left, const Parser<U, Input> right);
+    Parser<U, Input> operator>>(const Parser<T, Input>& left, const Parser<U, Input>& right);
 
     // | "or" operator parses the left parser, then the right parser if the left one fails without consuming
     template <typename T, typename Input>
@@ -510,12 +511,13 @@ namespace cpparsec {
     }
 
     // Apply a function to the parse result
+    // Not recommended, Parsec-style function application is faster
     template<typename T, typename Input>
     template <typename U>
-    Parser<U, Input> Parser<T, Input>::transform(std::function<U(T)> func) const {
+    Parser<U, Input> Parser<T, Input>::transform(auto&& func) const {
         return CPPARSEC_MAKE_METHOD(thisParser, Parser<U, Input>) {
-            ParseResult<T> result = thisParser.parse(input);
-            return result.transform(func);
+            CPPARSEC_SAVE(val, thisParser);
+            return func(val);
         };
     }
 
@@ -559,17 +561,12 @@ namespace cpparsec {
 
     template<typename O, typename C, typename T, typename Input>
     Parser<T, Input> between3(Parser<O> open, Parser<C> close, Parser<T, Input> p) {
-        return cpparsec::_ParserFactory<Parser<T, Input>>() = [=](Parser<T, Input>::InputStream& input)->cpparsec::ParseResult<typename Parser<T, Input>::Item> {
-            if (auto&& _cpparsec_skipresult = (open).parse(input); !_cpparsec_skipresult) {
-                return std::unexpected(std::move(_cpparsec_skipresult.error()));
-            };
-            auto&& _middle_ = (p).parse(input); if (!_middle_.has_value()) {
-                return std::unexpected(std::move(_middle_.error()));
-            } 
-            auto&& middle = _middle_.value();
+        return CPPARSEC_MAKE(Parser<T, Input>) {
+            CPPARSEC_SKIP(open);
+            CPPARSEC_SAVE(middle, p);
             if (auto&& _cpparsec_skipresult = (close).parse(input); !_cpparsec_skipresult) {
-                return std::unexpected(std::move(_cpparsec_skipresult.error()));
-            };
+    return std::unexpected(std::move(_cpparsec_skipresult.error()));
+};
 
             return middle;
         };
@@ -644,7 +641,7 @@ namespace cpparsec {
 
     // Parses successfully only if the input is empty
     // Input type must be specified for custom Input types
-    template <typename Input = std::string_view, typename T = std::monostate>
+    template <typename Input = std::string_view, std::default_initializable T = std::monostate>
     Parser<T, Input> eof() {
         return CPPARSEC_MAKE(Parser<T, Input>) {
             CPPARSEC_FAIL_IF(input.size() > 0, ParseError(std::format("{}", *input.begin()), "end of input"));
@@ -674,7 +671,7 @@ namespace cpparsec {
     //}
 
 
-    // Parses for an optional p, succeeds if p fails without consuming
+    // Parses for an optional p, succeeds if p fails without consuming, skip result
     template<typename T, typename Input>
     Parser<std::monostate, Input> optional_(Parser<T, Input> p) {
         return p.success(std::monostate{}) | success<Input>(std::monostate{});
@@ -898,14 +895,14 @@ namespace cpparsec {
     // << "ignore" operator returns the first result of two parsers
     // a << b is a.skip(b) 
     template <typename T, typename U, typename Input>
-    Parser<T, Input> operator<<(const Parser<T, Input> left, const Parser<U, Input> right) {
+    Parser<T, Input> operator<<(const Parser<T, Input>& left, const Parser<U, Input>& right) {
         return left.skip(right);
     }
 
     // >> "sequence" operator returns the second result of two parsers
     // a >> b is a.with(b) 
     template <typename T, typename U, typename Input>
-    Parser<U, Input> operator>>(const Parser<T, Input> left, const Parser<U, Input> right) {
+    Parser<U, Input> operator>>(const Parser<T, Input>& left, const Parser<U, Input>& right) {
         return left.with(right);
     }
 

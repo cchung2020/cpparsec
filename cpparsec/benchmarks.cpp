@@ -24,7 +24,7 @@ Parser<vector<string>> string_csv() {
     return sep_by1(many(char_satisfy(nonCommaChar)), char_(','));
 }
 
-int main() {
+void benchmark1() {
     bool _ignore = false;
 
     ankerl::nanobench::Bench().minEpochIterations(1000000).run("char parser", [&] {
@@ -50,12 +50,12 @@ int main() {
     ankerl::nanobench::Bench().minEpochIterations(100000).run("integer parser", [&] {
         ParseResult<int> num = int_().parse("23554567");
         ankerl::nanobench::doNotOptimizeAway(_ignore);
-    });
+        });
 
     ankerl::nanobench::Bench().minEpochIterations(100000).run("integer parser error reporting", [&] {
         ParseResult<int> num = int_().parse("X");
         ankerl::nanobench::doNotOptimizeAway(_ignore);
-    });
+        });
 
     string str_csv_input = "a, bc, def, ghij, jklmnop, qrestuvwxyz, dsiadisandiosndioni, daiondidsajhio dhsiofsdhuihrfsdfhdsifhniosdafoisadfni";
 
@@ -63,5 +63,28 @@ int main() {
         ParseResult<vector<string>> strs = string_csv().parse(str_csv_input);
 
         ankerl::nanobench::doNotOptimizeAway(_ignore);
-    });
+        });
+}
+
+void int_benchmarks();
+
+void between_benchmarks() {
+    bool _ignore = false;
+
+    ankerl::nanobench::Bench().minEpochIterations(100000).run("between spaces, int_ parser", [&] {
+        ParseResult<int> num = between(space(), space(), int_()).parse(" 123 ");
+        ankerl::nanobench::doNotOptimizeAway(_ignore);
+        });
+    ankerl::nanobench::Bench().minEpochIterations(100000).run("between spaces2, int_ parser", [&] {
+        ParseResult<int> num = between2(space(), space(), int_()).parse(" 123 ");
+        ankerl::nanobench::doNotOptimizeAway(_ignore);
+        });
+    ankerl::nanobench::Bench().minEpochIterations(100000).run("between spaces3, int_ parser", [&] {
+        ParseResult<int> num = between3(space(), space(), int_()).parse(" 123 ");
+        ankerl::nanobench::doNotOptimizeAway(_ignore);
+        });
+}
+
+int main() {
+    between_benchmarks();
 }
