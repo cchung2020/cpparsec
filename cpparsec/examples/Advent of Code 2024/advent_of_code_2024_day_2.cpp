@@ -1,5 +1,7 @@
-#include "../cpparsec.h"
-#include "../cpparsec_numeric.h"
+#include "../../cpparsec.h"
+#include "../../cpparsec_numeric.h"
+
+#include "../../cpparsec_shortmacro.h"
 
 /*
     parses input in a helpful format for https://adventofcode.com/2023/day/2
@@ -12,6 +14,7 @@ using Cube = std::pair<int, std::string>;
 using Game = std::pair<int, std::vector<Cube>>;
 
 // Parsec-style parsing
+// "5 red" -> {5, "red"}
 Parser<std::pair<int, std::string>> cube() {
     return CPPARSEC_MAKE(Parser<std::pair<int, std::string>>) {
         CPPARSEC_SAVE(cubeNum, int_() << space());
@@ -21,7 +24,8 @@ Parser<std::pair<int, std::string>> cube() {
     };
 }
 
-// behaves the same as above, Combine-style parsing
+// Above, Combine-style parsing
+// "5 red" -> {5, "red"}
 Parser<std::pair<int, std::string>> cube2() {
     return (int_() << space())
         .pair_with((string_("red") | string_("green") | string_("blue")));
