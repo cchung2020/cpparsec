@@ -58,7 +58,12 @@ namespace cpparsec {
     class ParseError {
     public:
         struct ErrorContent
-            : std::variant<std::pair<std::string, std::string>, std::pair<Atom, Atom>, std::string, std::monostate>
+            : std::variant<
+                    std::pair<std::string, std::string>, 
+                    std::pair<Atom, Atom>, 
+                    std::string, 
+                    std::monostate
+                >
         { };
 
         ParseError(ErrorContent&& err) : errors({ err }) { }
@@ -564,9 +569,7 @@ namespace cpparsec {
         return CPPARSEC_MAKE(Parser<T, Input>) {
             CPPARSEC_SKIP(open);
             CPPARSEC_SAVE(middle, p);
-            if (auto&& _cpparsec_skipresult = (close).parse(input); !_cpparsec_skipresult) {
-    return std::unexpected(std::move(_cpparsec_skipresult.error()));
-};
+            CPPARSEC_SKIP(close);
 
             return middle;
         };

@@ -68,21 +68,73 @@ void benchmark1() {
 
 void int_benchmarks();
 
-void between_benchmarks() {
+Parser<std::vector<int>> spaced_ints() {
+    return many(int_().skip(spaces()));
+}
+
+Parser<std::vector<int>> spaced_ints2() {
+    Parser<int> spaced_int = CPPARSEC_MAKE(Parser<int>) {
+        CPPARSEC_SAVE(val, int_());
+        CPPARSEC_SKIP(spaces());
+        return val;
+    };
+
+    return many(spaced_int);
+}
+
+void macro_benchmarks() {
     bool _ignore = false;
 
-    ankerl::nanobench::Bench().minEpochIterations(100000).run("between spaces, int_ parser", [&] {
-        ParseResult<int> num = between(space(), space(), int_()).parse(" 123 ");
+    ankerl::nanobench::Bench().minEpochIterations(50000).run("spaced_ints_ parser", [&] {
+        ParseResult<vector<int>> num = spaced_ints().parse("0 1732 -2783723 1723 -23823 281 +0237 12 2 +23");
+
         ankerl::nanobench::doNotOptimizeAway(_ignore);
         });
-    ankerl::nanobench::Bench().minEpochIterations(100000).run("between spaces2, int_ parser", [&] {
-        ParseResult<int> num = between2(space(), space(), int_()).parse(" 123 ");
+    ankerl::nanobench::Bench().minEpochIterations(50000).run("spaced_ints2 parser", [&] {
+        ParseResult<vector<int>> num = spaced_ints2().parse("0 1732 -2783723 1723 -23823 281 +0237 12 2 +23");
+
         ankerl::nanobench::doNotOptimizeAway(_ignore);
         });
-    ankerl::nanobench::Bench().minEpochIterations(100000).run("between spaces3, int_ parser", [&] {
-        ParseResult<int> num = between3(space(), space(), int_()).parse(" 123 ");
+}
+
+void between_benchmarks() {
+    bool _ignore = false;
+    string input = "x 0 1732 -2783723 1723 -23823 281 +0237 12 2 +23 enxd";
+    ankerl::nanobench::Bench().minEpochIterations(20000).run("between spaces/end, spacedint_ parser", [&] {
+        ParseResult<vector<int>> num = between(char_('!'), string_("end"), spaced_ints()).parse(input);
         ankerl::nanobench::doNotOptimizeAway(_ignore);
         });
+    ankerl::nanobench::Bench().minEpochIterations(20000).run("between spaces/end, spacedint_ parser", [&] {
+        ParseResult<vector<int>> num = between(char_('!'), string_("end"), spaced_ints()).parse(input);
+        ankerl::nanobench::doNotOptimizeAway(_ignore);
+        });
+    ankerl::nanobench::Bench().minEpochIterations(20000).run("between spaces/end, spacedint_ parser", [&] {
+        ParseResult<vector<int>> num = between(char_('!'), string_("end"), spaced_ints()).parse(input);
+        ankerl::nanobench::doNotOptimizeAway(_ignore);
+        });
+
+    //ankerl::nanobench::Bench().minEpochIterations(20000).run("between2 spaces/end, spacedint_ parser", [&] {
+    //    ParseResult<vector<int>> num = between2(spaces(), string_("end"), spaced_ints()).parse(input);
+    //    ankerl::nanobench::doNotOptimizeAway(_ignore);
+    //    });
+    //ankerl::nanobench::Bench().minEpochIterations(20000).run("between3 spaces/end, spacedint_ parser", [&] {
+    //    ParseResult<vector<int>> num = between3(spaces(), string_("end"), spaced_ints()).parse(input);
+    //    ankerl::nanobench::doNotOptimizeAway(_ignore);
+    //    });
+
+    //println("");
+    //ankerl::nanobench::Bench().minEpochIterations(20000).run("between spaces/end, spacedint2_ parser", [&] {
+    //    ParseResult<vector<int>> num = between(spaces(), string_("end"), spaced_ints2()).parse(input);
+    //    ankerl::nanobench::doNotOptimizeAway(_ignore);
+    //    });
+    //ankerl::nanobench::Bench().minEpochIterations(20000).run("between2 spaces/end, spacedint2_ parser", [&] {
+    //    ParseResult<vector<int>> num = between2(spaces(), string_("end"), spaced_ints2()).parse(input);
+    //    ankerl::nanobench::doNotOptimizeAway(_ignore);
+    //    });
+    //ankerl::nanobench::Bench().minEpochIterations(20000).run("between3 spaces/end, spacedint2_ parser", [&] {
+    //    ParseResult<vector<int>> num = between3(spaces(), string_("end"), spaced_ints2()).parse(input);
+    //    ankerl::nanobench::doNotOptimizeAway(_ignore);
+    //    });
 }
 
 int main() {

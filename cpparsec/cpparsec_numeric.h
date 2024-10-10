@@ -20,7 +20,7 @@ namespace cpparsec {
             CPPARSEC_SAVE(sign, optional_result(char_('-') | char_('+')));
             CPPARSEC_SAVE(digits_str, many1(digit()));
 
-            int num_sign = (sign.has_value() && sign.value() == '+') ? 1 : -1;
+            int num_sign = (sign.has_value() && sign.value() == '-') ? -1 : 1;
             return num_sign * std::stoi(digits_str);
         };
     }
@@ -31,7 +31,7 @@ namespace cpparsec {
             CPPARSEC_SAVE(sign, optional_result(char_('-') | char_('+')));
             CPPARSEC_SAVE(digits, many1(digit()));
 
-            int num_sign = (sign.has_value() && sign.value() == '+') ? 1 : -1;
+            int num_sign = (sign.has_value() && sign.value() == '-') ? -1 : 1;
             return num_sign * detail::fast_stoi(digits);
         };
     }
@@ -63,7 +63,7 @@ namespace cpparsec {
         return (optional_result(char_('-') | char_('+')) & many1(digit()))
             .transform<int>([](auto&& s) constexpr { 
                 auto&& [sign, digits_str] = s;
-                int num_sign = (sign.has_value() && sign.value() == '+') ? 1 : -1;
+                int num_sign = (sign.has_value() && sign.value() == '-') ? -1 : 1;
                 return num_sign * std::stoi(digits_str);
             });
     }

@@ -8,7 +8,7 @@ Many of the design decisions are deliberately probing what is possible using the
 
 # How do I install/compile it?
 
-Currently the project is header only. `include cpparsec.h` for the base character/std::string specialized parsers.
+The project is header only. `#include cpparsec.h` for the base character/std::string specialized parsers.
 
 It's a header file which simply includes cpparsec_core.h and cpparsec_char.h.
 
@@ -17,7 +17,43 @@ It's a header file which simply includes cpparsec_core.h and cpparsec_char.h.
 
 # How do I use it?
 
-See [examples folder](https://github.com/cchung2020/cpparsec/tree/master/cpparsec/examples) and [tests](https://github.com/cchung2020/cpparsec/tree/master/cpparsec/tests) for usage.
+Three steps: 
+1. Initialize a parser
+2. Parse something with the parser
+3. Do something with the result
+
+See this small complete example program.
+```C++
+#include <print>
+#include "cpparsec.h"
+#include "cpparsec_numeric.h"
+
+using namespace cpparsec;
+
+// building a parser which reads ints and skips spaces after the first int
+Parser<std::vector<int>> spaced_ints() {
+	return many(int_().skip(spaces()));
+}
+
+int main() {
+	std::string input = "1 2 3 4 5 6";  
+	ParseResult<std::vector<int>> result = spaced_ints().parse(input);
+    //                                     ^step 1       ^step 2  
+	// step 3
+	if (result.has_value()) {
+		std::vector<int> nums = result.value();
+		for (int n : nums) {
+			std::print("{} ", n);
+		}
+	}
+	else {
+		println("{}", result.error()().message());
+	}
+}
+```
+Output: `1 2 3 4 5 6`
+
+See [examples folder](https://github.com/cchung2020/cpparsec/tree/master/cpparsec/examples) and [tests](https://github.com/cchung2020/cpparsec/tree/master/cpparsec/tests) for more usage.
 
 # To do:
 * Make error handling more efficient (!)
