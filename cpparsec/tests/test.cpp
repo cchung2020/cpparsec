@@ -476,9 +476,9 @@ BOOST_AUTO_TEST_SUITE(LookAhead_NotFollowedBy_Parsers)
 BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser)
 {
     auto partialParseNum = [](const string& word, int num) {
-        return try_(
-            look_ahead(string_(word)) >> char_(word[0]) >> success(num)
-        );
+            return try_(
+                look_ahead(string_(word)) >> char_(word[0]) >> success(num)
+            );
         };
 
     Parser<int> wordToNum =
@@ -494,7 +494,7 @@ BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser)
 
     function charToInt = [](char c) { return c - '0'; };
 
-    Parser<int> number = digit().transform(charToInt) | wordToNum;
+    Parser<int> number = digit().transform<int>(charToInt) | wordToNum;
 
     Parser<int> numberBetweenLetters = number.between(
         (many(not_followed_by(number) >> letter())),

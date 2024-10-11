@@ -38,7 +38,7 @@ Parser<std::vector<int>> spaced_ints() {
 int main() {
 	std::string input = "1 2 3 4 5 6";  
 	ParseResult<std::vector<int>> result = spaced_ints().parse(input);
-    //                                     ^step 1       ^step 2  
+	//                                     ^step 1       ^step 2  
 	// step 3
 	if (result.has_value()) {
 		std::vector<int> nums = result.value();
