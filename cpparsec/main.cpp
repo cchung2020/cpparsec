@@ -19,6 +19,6 @@ int main() {
 		}
 	}
 	else {
-		println("{}", result.error()().message());
+		std::println("{}", result.error()().message());
 	}
 }

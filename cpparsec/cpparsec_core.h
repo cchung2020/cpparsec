@@ -14,6 +14,8 @@
 #include <ranges>
 #include <concepts>
 
+using std::println;
+
 // Initialize a variable with a parse result value
 // Automatically returns if the parser fails
 #define CPPARSEC_SAVE(var, ...)                               \
@@ -31,10 +33,10 @@
     }                                                                            \
 
 // Automatically returns ParseError if the condition is true 
-#define CPPARSEC_FAIL_IF(cond, message) if (cond) { return std::unexpected([=]() { return message; }); }
+#define CPPARSEC_FAIL_IF(cond, message) if (cond) { return std::unexpected(message); }
 
 // Automatically returns ParseError
-#define CPPARSEC_FAIL(message) return std::unexpected([=]() { return message; });
+#define CPPARSEC_FAIL(message) return std::unexpected(message);
 
 #define CPPARSEC_MAKE(...) \
     cpparsec::_ParserFactory<__VA_ARGS__> () = [=](__VA_ARGS__::InputStream& input) -> cpparsec::ParseResult<typename __VA_ARGS__::Item>
@@ -42,7 +44,6 @@
 #define CPPARSEC_MAKE_METHOD(name, ...) \
     cpparsec::_ParserFactory<__VA_ARGS__> () = [=, name = *this](__VA_ARGS__::InputStream& input) -> cpparsec::ParseResult<typename __VA_ARGS__::Item>
 
-using std::println;
 
 namespace cpparsec {
 
@@ -88,7 +89,7 @@ namespace cpparsec {
     };
 
     template<typename T, std::formattable<char> Atom = char>
-    using ParseResult = std::expected<T, std::function<ParseError<Atom>()>>;
+    using ParseResult = std::expected<T, ParseError<Atom>>;
 
     // ============================ PARSER CONCEPTS ===========================
 
@@ -527,7 +528,7 @@ namespace cpparsec {
     }
 
     // ======================= Core Parser Combinators ========================
-
+    
     // Parses given number of parses
     template<typename T, typename Input>
     Parser<std::vector<T>, Input> count(int n, Parser<T, Input> p) {
@@ -686,7 +687,7 @@ namespace cpparsec {
         return CPPARSEC_MAKE(Parser<std::optional<T>, Input>) {
             auto start_point = input.data();
             ParseResult<T> result = p.parse(input);
-            CPPARSEC_FAIL_IF(!result && start_point != input.data(), result.error()());
+            CPPARSEC_FAIL_IF(!result && start_point != input.data(), result.error());
 
             return (result ? std::optional(result.value()) : std::nullopt);
         };
@@ -856,7 +857,7 @@ namespace cpparsec {
                 auto start_point = input.data();
                 ParseResult<std::function<T(T, T)>> f = op.parse(input);
                 if (!f) {
-                    CPPARSEC_FAIL_IF(start_point != input.data(), f.error()());
+                    CPPARSEC_FAIL_IF(start_point != input.data(), f.error());
                     break;
                 }
                 CPPARSEC_SAVE(arg2, arg);
@@ -967,7 +968,7 @@ namespace cpparsec {
         return CPPARSEC_MAKE(Parser<T, Input>) {
             ParseResult<T> result = p.parse(input);
             if (!result) {
-                ParseError err = result.error()();
+                ParseError err = result.error();
                 err.add_error({ msg });
                 CPPARSEC_FAIL(err);
             }

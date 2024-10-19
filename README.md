@@ -25,6 +25,7 @@ Three steps:
 See this small complete example program.
 ```C++
 #include <print>
+#include <vector>
 #include "cpparsec.h"
 #include "cpparsec_numeric.h"
 
