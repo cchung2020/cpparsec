@@ -26,6 +26,7 @@ See this small complete example program.
 ```C++
 #include <print>
 #include <vector>
+#include <numeric>
 #include "cpparsec.h"
 #include "cpparsec_numeric.h"
 
@@ -37,22 +38,26 @@ Parser<std::vector<int>> spaced_ints() {
 }
 
 int main() {
-	std::string input = "1 2 3 4 5 6";  
+	std::string input = "1 2 3 4 5 6";
 	ParseResult<std::vector<int>> result = spaced_ints().parse(input);
 	//                                     ^step 1       ^step 2  
 	// step 3
 	if (result.has_value()) {
 		std::vector<int> nums = result.value();
+		int input_sum = std::accumulate(nums.begin(), nums.end(), 0);
+
 		for (int n : nums) {
 			std::print("{} ", n);
 		}
+		std::println("sums to {} ", input_sum);
 	}
 	else {
-		println("{}", result.error()().message());
+		std::println("{}", result.error().message());
 	}
 }
+
 ```
-Output: `1 2 3 4 5 6`
+Output: `1 2 3 4 5 6 sums to 21`
 
 See [examples folder](https://github.com/cchung2020/cpparsec/tree/master/cpparsec/examples) and [tests](https://github.com/cchung2020/cpparsec/tree/master/cpparsec/tests) for more usage.
 

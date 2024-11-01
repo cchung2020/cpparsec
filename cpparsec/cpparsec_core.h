@@ -119,9 +119,10 @@ namespace cpparsec {
     public:
         using Item = T;
         using InputStream = Input;
-        using ParseFunction = std::function<ParseResult<T>(InputStream&)>; // ParseResult<T>(*)(InputStream&)
-              // function takes InputStream, returns ParserResult<T>
-
+        using ParseFunction = std::function<ParseResult<T>(InputStream&)>; // function takes InputStream, returns ParserResult<T>
+        // ParseResult<T>(*)(InputStream&)
+        
+    
     private:
         ParseFunction parser;
 
