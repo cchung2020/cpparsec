@@ -8,7 +8,7 @@ Many of the design decisions are deliberately probing what is possible using the
 
 # How do I install/compile it?
 
-The project is header only. `#include cpparsec.h` for the base character/std::string specialized parsers.
+The project is header only. `#include cpparsec.h` for the base `char`/`std::string` specialized parsers.
 
 It's a header file which simply includes cpparsec_core.h and cpparsec_char.h.
 
@@ -22,7 +22,7 @@ Three steps:
 2. Parse something with the parser
 3. Do something with the result
 
-See this small complete example program.
+See this small complete example program:
 ```C++
 #include <print>
 #include <vector>
@@ -32,7 +32,7 @@ See this small complete example program.
 
 using namespace cpparsec;
 
-// building a parser which reads ints and skips spaces after the first int
+// makes a parser which reads multiple ints, ignoring spaces after the first int
 Parser<std::vector<int>> spaced_ints() {
 	return many(int_().skip(spaces()));
 }
@@ -67,7 +67,7 @@ See [examples folder](https://github.com/cchung2020/cpparsec/tree/master/cpparse
 * Investigate lowering compile times (!) but I suspect it's impossible without a total rewrite
 * Investigate gap between debug and release build, currently up to 150x difference (!)
 * Add more benchmarking tests (maybe GitHub actions-supported?)
-* Add a more tests
+* Add more tests
 * Add more examples
 
 This project is licensed under the terms of the MIT license.

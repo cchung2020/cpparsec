@@ -420,14 +420,13 @@ BOOST_AUTO_TEST_CASE(ChainL_Parser)
 {
     auto add_op = success(function<int(int, int)>([](int a, int b) { return a + b; }));
     auto mul_op = success(function<int(int, int)>([](int a, int b) { return a * b; }));
-
     auto spaced = [](auto p) { return p.between(spaces(), spaces()); };
 
     function<Parser<int>()> expr, term, factor;
 
-    factor = [&]() { return spaced(int_() | lazy(expr).between(char_('('), char_(')'))); };
-    term = [&]() { return chainl1(factor(), char_('*') >> mul_op); };
-    expr = [&]() { return chainl1(term(), char_('+') >> add_op); };
+    factor = [&] { return spaced(int_() | lazy(expr).between(char_('('), char_(')'))); };
+    term = [&] { return chainl1(factor(), char_('*') >> mul_op); };
+    expr = [&] { return chainl1(term(), char_('+') >> add_op); };
 
     ParseResult<int> result1 = expr().parse("2+3*4");
 
@@ -492,9 +491,9 @@ BOOST_AUTO_TEST_CASE(LookAhead_NotFollowedBy_Parser)
         | partialParseNum("eight", 8)
         | partialParseNum("nine", 9);
 
-    function charToInt = [](char c) { return c - '0'; };
+    auto charToInt = [](char c) { return c - '0'; };
 
-    Parser<int> number = digit().transform<int>(charToInt) | wordToNum;
+    Parser<int> number = digit().transform(charToInt) | wordToNum;
 
     Parser<int> numberBetweenLetters = number.between(
         (many(not_followed_by(number) >> letter())),
@@ -536,7 +535,7 @@ BOOST_AUTO_TEST_CASE(Satisfy_IsDigit_Success)
     string_view input = inputStr;
 
     auto is_digit = [](char c) { return isdigit(c); };
-    Parser<char> digit_parser = satisfy<char>(any_char(), is_digit);
+    Parser<char> digit_parser = satisfy(any_char(), is_digit);
     ParseResult<char> result = digit_parser.parse(input);
 
     BOOST_REQUIRE(result.has_value());
@@ -550,7 +549,7 @@ BOOST_AUTO_TEST_CASE(Satisfy_IsDigit_Failure)
     string_view input = inputStr;
 
     auto is_digit = [](char c) { return isdigit(c); };
-    Parser<char> digit_parser = satisfy<char>(any_char(), is_digit);
+    Parser<char> digit_parser = any_char().satisfy(is_digit);
     ParseResult<char> result = digit_parser.parse(input);
 
     BOOST_REQUIRE(!result.has_value());

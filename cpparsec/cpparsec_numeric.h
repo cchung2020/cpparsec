@@ -61,7 +61,7 @@ namespace cpparsec {
     // Parses an int
     inline Parser<int> int_2() {
         return (optional_result(char_('-') | char_('+')) & many1(digit()))
-            .transform<int>([](auto&& s) constexpr { 
+            .transform([](auto&& s) constexpr { 
                 auto&& [sign, digits_str] = s;
                 int num_sign = (sign.has_value() && sign.value() == '-') ? -1 : 1;
                 return num_sign * std::stoi(digits_str);
@@ -78,7 +78,7 @@ namespace cpparsec {
 
     // Parses an unsigned int
     inline Parser<int> uint_2() {
-        return many1(digit()).transform<int>([](auto&& s) constexpr { return std::stoi(s); });
+        return many1(digit()).transform([](auto&& s) constexpr { return std::stoi(s); });
     }
 
 };

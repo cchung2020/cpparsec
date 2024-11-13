@@ -93,10 +93,10 @@ namespace cpparsec {
 
     // ============================ PARSER CONCEPTS ===========================
 
-    // Parser: you can call .parse(s) on it, and it returns a ParserResult
+    // Concept for a Parser that you can call .parse(s) on it, and it returns a ParserResult
     template<typename Parser, typename T, typename Input>
     concept ParserType = requires(Parser p, Input& s) {
-        { p.parse(s) }; // ->std::same_as<ParseResult<T>>;
+        { p.parse(s) } -> std::same_as<ParseResult<T>>;
     };
 
     // Concept for a container that can call push_back
@@ -169,8 +169,8 @@ namespace cpparsec {
 
         // Apply a function to the parse result
         // Not recommended, Parsec-style function application is faster
-        template <typename U>
-        Parser<U, Input> transform(auto&& func) const;
+        template <typename Func>
+        auto transform(Func&& func) const;
 
         //// Apply a function to the parse result
         //Parser<auto, Input> transform(auto func) const {
@@ -464,7 +464,7 @@ namespace cpparsec {
     Parser<T, Input> Parser<T, Input>::satisfy(std::function<bool(T)> cond) const {
         return CPPARSEC_MAKE_METHOD(thisParser, Parser<T, Input>) {
             ParseResult<T> result = thisParser.parse(input);
-            CPPARSEC_FAIL_IF(!result || !cond(*result), result.error());
+            CPPARSEC_FAIL_IF(!result || !cond(*result), ParseError("Failed satisfy"));
 
             return result;
         };
@@ -520,13 +520,15 @@ namespace cpparsec {
     // Apply a function to the parse result
     // Not recommended, Parsec-style function application is faster
     template<typename T, typename Input>
-    template <typename U>
-    Parser<U, Input> Parser<T, Input>::transform(auto&& func) const {
+    template <typename Func>
+    auto Parser<T, Input>::transform(Func&& func) const {
+        using U = typename std::invoke_result_t<Func, T>;
         return CPPARSEC_MAKE_METHOD(thisParser, Parser<U, Input>) {
             CPPARSEC_SAVE(val, thisParser);
             return func(val);
         };
     }
+
 
     // ======================= Core Parser Combinators ========================
     
@@ -620,7 +622,7 @@ namespace cpparsec {
     Parser<T, Input> satisfy(const Parser<T, Input>& p, auto cond) {
         return CPPARSEC_MAKE(Parser<T, Input>) {
             ParseResult<T> result = p.parse(input);
-            CPPARSEC_FAIL_IF(!result || !cond(*result), std::format("Failed satisfy"));
+            CPPARSEC_FAIL_IF(!result || !cond(*result), ParseError("Failed satisfy"));
 
             return result;
         };

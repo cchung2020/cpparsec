@@ -315,7 +315,7 @@ namespace cpparsec_example {
 
     // Parses an int
     inline CharParser<int> int_() {
-        return many1(digit()).transform<int>([](auto&& s) { return std::stoi(s); });
+        return many1(digit()).transform([](auto&& s) { return std::stoi(s); });
     }
 };
 

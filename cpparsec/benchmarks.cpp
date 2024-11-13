@@ -39,11 +39,17 @@ void benchmark1() {
 
     ankerl::nanobench::Bench().minEpochIterations(100000).run("string parser", [&] {
         ParseResult<string> str = string_("longstringtesterjontester").parse("longstringtesterjontester");
+        if (str.value() != "longstringtesterjontester") {
+            println("FAKE");
+        }
         ankerl::nanobench::doNotOptimizeAway(_ignore);
         });
 
     ankerl::nanobench::Bench().minEpochIterations(100000).run("inefficient_string parser", [&] {
         ParseResult<string> str = inefficient_string("longstringtesterjontester").parse("longstringtesterjontester");
+        if (str.value() != "longstringtesterjontester") {
+            println("FAKE");
+        }
         ankerl::nanobench::doNotOptimizeAway(_ignore);
         });
 
@@ -138,5 +144,5 @@ void between_benchmarks() {
 }
 
 int main() {
-    between_benchmarks();
+    benchmark1();
 }
